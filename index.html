@@ -3,9 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Probability Spinner Simulator — Visual+</title>
+<title>Probability Spinner Simulator — Visual+ (No FX during Autorun)</title>
 <style>
-  /* ===== Light theme tokens (color-blind-safe slices kept) ===== */
   :root{
     --bg:#ffffff; --fg:#111; --muted:#555; --border:#000;
     --card:#ffffff; --shadow:0 6px 18px rgba(0,0,0,.10);
@@ -13,7 +12,6 @@
     --wheel-rim:#111; --progress-bg:#e6e6e6; --progress-fg:#0b72b9;
   }
 
-  /* ===== Base layout ===== */
   body{ background:var(--bg); color:var(--fg); font-family:Arial, Helvetica, sans-serif; margin:24px 0; }
   .app{ width:min(100%, 1100px); margin:0 auto; padding:0 14px; }
   h1{ font-size:34px; margin:0 0 16px; text-align:center; }
@@ -35,10 +33,9 @@
 
   .card{ background:var(--card); border:2px solid var(--border); border-radius:16px; box-shadow:var(--shadow); padding:16px; margin:16px 0; }
 
-  /* ===== Table (wider, fixed layout, no overlap) ===== */
+  /* Wider, fixed-layout table to avoid overlap */
   .table-wrap{ width:min(100%, 780px); margin:0 auto; }
-  table{ width:100%; border-collapse:separate; border-spacing:0; border-radius:18px; overflow:hidden; background:#fff;
-         table-layout:fixed; }
+  table{ width:100%; border-collapse:separate; border-spacing:0; border-radius:18px; overflow:hidden; background:#fff; table-layout:fixed; }
   th, td{ border:4px solid #000; padding:12px 14px; text-align:center; }
   th{ background:#f4f6f9; font-size:22px; font-weight:700; }
   td input{ width:100%; max-width:100%; margin:2px 0; box-sizing:border-box; }
@@ -46,7 +43,6 @@
   .note{ color:var(--muted); font-size:14px; text-align:center; }
   .warn{ color:var(--warn); font-size:16px; margin-top:8px; text-align:center; }
 
-  /* ===== Spinner + controls ===== */
   .flex-split{ display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap; justify-content:center; }
   .wheel-panel{ position:relative; display:flex; flex-direction:column; align-items:center; gap:10px; }
   .mini-panel{ display:flex; flex-direction:column; gap:12px; }
@@ -81,18 +77,24 @@
   .pwbox{ display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap; justify-content:center; }
   .pwbox input{ width:240px; }
 
-  /* Coin burst + popup */
-  .coin{ position:absolute; font-size:20px; filter:drop-shadow(0 2px 1px rgba(0,0,0,.35)); animation:coinUp 900ms ease-out forwards; }
+  /* Larger / more dramatic celebration */
+  .coin{ position:absolute; font-size:28px; filter:drop-shadow(0 2px 1px rgba(0,0,0,.35)); animation:coinUp 1400ms ease-out forwards; }
   @keyframes coinUp{
-    0%{ transform:translate(0,0) scale(.8); opacity:0; }
-    20%{ opacity:1; }
-    100%{ transform:translate(var(--tx), var(--ty)) scale(1.1); opacity:0; }
+    0%{ transform:translate(0,0) scale(.7) rotate(0deg); opacity:0; }
+    18%{ opacity:1; }
+    100%{ transform:translate(var(--tx), var(--ty)) scale(1.25) rotate(var(--rot)); opacity:0; }
   }
-  .popup{ position:absolute; font-size:22px; font-weight:800; color:var(--ok); animation:popFloat 1100ms ease-out forwards;}
-  @keyframes popFloat{
-    0%{ transform:translateY(0); opacity:0; }
+  .confetti{ position:absolute; width:10px; height:16px; border-radius:2px; box-shadow:0 1px 1px rgba(0,0,0,.25); animation:confettiBurst 1500ms cubic-bezier(.2,.8,.2,1) forwards; }
+  @keyframes confettiBurst{
+    0%{ transform:translate(0,0) scale(.6) rotate(0deg); opacity:0; }
     15%{ opacity:1; }
-    100%{ transform:translateY(-70px); opacity:0; }
+    100%{ transform:translate(var(--tx), var(--ty)) scale(1) rotate(var(--rot)); opacity:0; }
+  }
+  .popup{ position:absolute; font-size:32px; font-weight:900; color:gold; text-shadow:0 2px 0 rgba(0,0,0,.35), 0 6px 12px rgba(0,0,0,.25); animation:popFloat 1400ms ease-out forwards;}
+  @keyframes popFloat{
+    0%{ transform:translateY(0) scale(.9); opacity:0; }
+    15%{ opacity:1; }
+    100%{ transform:translateY(-90px) scale(1.05); opacity:0; }
   }
 </style>
 </head>
@@ -113,31 +115,20 @@
 
       <div class="table-wrap">
         <table id="prizeTable" aria-label="Prize and percentage table">
-          <!-- fixed column widths to prevent overlap -->
           <colgroup>
-            <col style="width:40%;">
-            <col style="width:40%;">
-            <col style="width:20%;">
+            <col style="width:40%;"><col style="width:40%;"><col style="width:20%;">
           </colgroup>
           <thead>
-            <tr>
-              <th>Prize</th>
-              <th>Percentage chance</th>
-              <th>Row</th>
-            </tr>
+            <tr><th>Prize</th><th>Percentage chance</th><th>Row</th></tr>
           </thead>
-          <tbody><!-- rows inserted by JS --></tbody>
-          <tfoot>
-            <tr><td colspan="3" class="note">Percentages must total 100%.</td></tr>
-          </tfoot>
+          <tbody></tbody>
+          <tfoot><tr><td colspan="3" class="note">Percentages must total 100%.</td></tr></tfoot>
         </table>
       </div>
 
       <div id="sumWarnAboveButtons" class="warn hidden">% does not total 100</div>
 
-      <div class="row" style="justify-content:center;">
-        <button id="addRowBtn">Add row</button>
-      </div>
+      <div class="row" style="justify-content:center;"><button id="addRowBtn">Add row</button></div>
 
       <div class="row" style="justify-content:center;">
         <button id="revealKeyBtn">Reveal key information</button>
@@ -216,15 +207,16 @@
   <audio id="spinSound" src="https://www.soundjay.com/button/sounds/button-16.mp3"></audio>
 
 <script>
-/* ================== STATE ================== */
+/* ---------- State ---------- */
 let values=[], probs=[], cdf=[];
 let balance=0, cost=25, startingBalance=0, spinCount=0;
 let balanceHistory=[], resultFlags=[];
 let autoRunInterval=null, insufficientFundsShown=false;
 let wheelSegments=[], rotation=0, spinning=false;
 let highlightIdx=null, highlightUntil=0;
+let fxEnabled = true; // celebration FX disabled during autorun
 
-/* ================== ELEMENTS ================== */
+/* ---------- Elements ---------- */
 const tableBody=document.querySelector('#prizeTable tbody');
 const addRowBtn=document.getElementById('addRowBtn');
 const submitButton=document.getElementById('submitButton');
@@ -268,17 +260,17 @@ const donutCanvas=document.getElementById('donutCanvas');
 const dctx=donutCanvas.getContext('2d');
 const TAU=Math.PI*2;
 
-/* Color-blind-safe Okabe–Ito palette */
+/* Color-blind-safe palette */
 const palette=["#E69F00","#56B4E9","#009E73","#F0E442","#0072B2","#D55E00","#CC79A7","#999999"];
 
-/* ================== HELPERS ================== */
+/* ---------- Helpers ---------- */
 const fmtMoney=n=>Number(n).toFixed(2);
 const fmtPct=n=>(Number(n)*100).toFixed(2)+"%";
 const modTau=a=>((a%TAU)+TAU)%TAU;
 const easeOutCubic=t=>1-Math.pow(1-t,3);
-function varGet(name){ return getComputedStyle(document.body).getPropertyValue(name).trim(); }
+const varGet=name=>getComputedStyle(document.body).getPropertyValue(name).trim();
 
-/* ================== MENU TABLE ================== */
+/* ---------- Table ---------- */
 function addRow(v="",p=""){
   const tr=document.createElement('tr');
   tr.innerHTML=`
@@ -308,7 +300,7 @@ function buildDistributionFromTable(){
 }
 function expectedPrizeWeighted(){ return values.reduce((s,v,i)=>s+v*probs[i],0); }
 
-/* ================== KEY INFO ================== */
+/* ---------- Key info ---------- */
 function renderKeyStats(){
   const costPer=Number(costInput.value); if(Number.isNaN(costPer)||costPer<=0) return;
   const avg=expectedPrizeWeighted(), rtp=avg/costPer, ev=avg-costPer, houseEdge=1-rtp;
@@ -330,7 +322,7 @@ function autoRefreshKeyInfo(){
   else sumWarnAboveButtons.classList.toggle('hidden', percentagesSumTo100());
 }
 
-/* ================== WHEEL + DONUT ================== */
+/* ---------- Wheel & donut ---------- */
 function buildWheelSegments(){
   wheelSegments=[]; let a=0;
   for(let i=0;i<probs.length;i++){
@@ -361,7 +353,6 @@ function drawWheel(){
   });
   wctx.restore();
 
-  // labels (skip tiny)
   wctx.fillStyle="#000"; wctx.font="16px Arial"; wctx.textAlign="center"; wctx.textBaseline="middle";
   wheelSegments.forEach((seg)=>{
     const span=seg.end-seg.start; if(span<0.06) return;
@@ -370,13 +361,11 @@ function drawWheel(){
     wctx.fillText(seg.label, rx, ry);
   });
 
-  // center cap
   wctx.beginPath(); wctx.arc(CX,CY, 20, 0, TAU); wctx.fillStyle="#fff"; wctx.fill();
   wctx.strokeStyle=varGet("--wheel-rim"); wctx.lineWidth=2; wctx.stroke();
 
   drawPointerShiny();
 
-  // win highlight glow (if active)
   if(highlightIdx!==null && Date.now()<highlightUntil){
     const seg=wheelSegments[highlightIdx];
     wctx.save();
@@ -386,7 +375,6 @@ function drawWheel(){
     wctx.restore();
   }
 }
-const TAU_CONST = Math.PI*2;
 function segmentMidAngle(idx){ const seg=wheelSegments[idx]; return (seg.start+seg.end)/2; }
 function animateSpinToIndex(idx,onDone){
   if(!wheelSegments.length){ onDone&&onDone(); return; }
@@ -415,13 +403,12 @@ function renderDonut(){
     dctx.fillStyle=palette[i%palette.length];
     dctx.arc(cx,cy,r,a,a+span); dctx.lineTo(cx,cy); dctx.fill(); a+=span;
   }
-  // donut hole
   dctx.globalCompositeOperation="destination-out"; dctx.beginPath(); dctx.arc(cx,cy,inner,0,TAU); dctx.fill();
   dctx.globalCompositeOperation="source-over"; dctx.strokeStyle="#000"; dctx.lineWidth=2; dctx.beginPath(); dctx.arc(cx,cy,r,0,TAU); dctx.stroke();
   dctx.beginPath(); dctx.arc(cx,cy,inner,0,TAU); dctx.stroke();
 }
 
-/* ================== GRAPH (full redraw) ================== */
+/* ---------- Graph ---------- */
 const graph={ left:70,right:24,top:46,bottom:46,yMin:null,yMax:null };
 function computeYRange(){
   const minBal=Math.min(...balanceHistory), maxBal=Math.max(...balanceHistory);
@@ -444,13 +431,10 @@ function drawAxesAndGrid(){
 function fullRedraw(){
   if(balanceHistory.length===0){ gctx.clearRect(0,0,graphCanvas.width,graphCanvas.height); return; }
   const {yMin,yMax}=computeYRange(); graph.yMin=yMin; graph.yMax=yMax; drawAxesAndGrid();
-  // line
   gctx.strokeStyle="#1e88e5"; gctx.lineWidth=3; gctx.beginPath();
   for(let i=0;i<balanceHistory.length;i++){ const x=xToPx(i), y=yToPx(balanceHistory[i]); if(i===0) gctx.moveTo(x,y); else gctx.lineTo(x,y); } gctx.stroke();
-  // points
   gctx.fillStyle="#e53935";
   for(let i=0;i<balanceHistory.length;i++){ const x=xToPx(i), y=yToPx(balanceHistory[i]); gctx.beginPath(); gctx.arc(x,y,3,0,TAU); gctx.fill(); }
-  // win/loss markers every 10 spins
   const H=graphCanvas.height, bottom=graph.bottom, baseY=H-bottom+4;
   for(let i=10;i<=balanceHistory.length-1;i+=10){
     const winFlag=resultFlags[i-1]; gctx.strokeStyle= winFlag ? "#2ca02c" : "#d62728"; gctx.lineWidth=3;
@@ -458,7 +442,7 @@ function fullRedraw(){
   }
 }
 
-/* ================== RUN / SPIN ================== */
+/* ---------- Spin logic ---------- */
 function weightedPick(){
   const r=Math.random(); let lo=0, hi=cdf.length-1, ans=hi;
   while(lo<=hi){ const mid=(lo+hi)>>1; if(r<=cdf[mid]){ ans=mid; hi=mid-1; } else lo=mid+1; } return ans;
@@ -468,35 +452,56 @@ function updateGauge(){
   gaugeFill.style.width = pct + "%";
   gaugeLabel.textContent = pct.toFixed(0) + "%";
 }
+
+/* Celebration FX: disabled during autorun; triggers on wins > 1× cost */
 function celebrateBigWin(amount){
-  const threshold = 10*Number(costInput.value);
-  if(amount < threshold) return;
+  const threshold = Number(costInput.value);   // 1× cost
+  if (!fxEnabled || amount <= threshold) return;
+
+  const confettiColors = ['#FF595E','#FFCA3A','#8AC926','#1982C4','#6A4C93','#FFD166','#06D6A0'];
+
   // coins
-  for(let i=0;i<16;i++){
+  for(let i=0;i<24;i++){
     const span=document.createElement('div'); span.className='coin'; span.textContent='🪙';
-    const tx=(Math.random()*240-120)+'px', ty=(Math.random()*-180-60)+'px';
+    const tx=(Math.random()*360-180)+'px';
+    const ty=(Math.random()*-240-120)+'px';
+    const rot=(Math.random()*720-360)+'deg';
     span.style.setProperty('--tx', tx); span.style.setProperty('--ty', ty);
-    effects.appendChild(span); setTimeout(()=>span.remove(), 1000);
+    span.style.setProperty('--rot', rot);
+    effects.appendChild(span); setTimeout(()=>span.remove(), 1600);
+  }
+  // confetti rectangles
+  for(let i=0;i<40;i++){
+    const bit=document.createElement('div'); bit.className='confetti';
+    const tx=(Math.random()*420-210)+'px';
+    const ty=(Math.random()*-260-130)+'px';
+    const rot=(Math.random()*720-360)+'deg';
+    bit.style.background = confettiColors[i % confettiColors.length];
+    bit.style.setProperty('--tx', tx); bit.style.setProperty('--ty', ty); bit.style.setProperty('--rot', rot);
+    effects.appendChild(bit); setTimeout(()=>bit.remove(), 1700);
   }
   // popup
   const pop=document.createElement('div'); pop.className='popup'; pop.textContent=`+${fmtMoney(amount)}`;
-  pop.style.color="gold"; pop.style.textShadow="0 2px 0 rgba(0,0,0,.35)";
-  effects.appendChild(pop); setTimeout(()=>pop.remove(), 1100);
+  effects.appendChild(pop); setTimeout(()=>pop.remove(), 1500);
 }
+
 function setProgress(show, frac=0){
   runProgress.style.visibility = show ? 'visible' : 'hidden';
   progressBar.style.width = (Math.max(0, Math.min(1, frac))*100).toFixed(1) + "%";
 }
+
 function settleSpin(idx,win,manual){
   balance -= Number(costInput.value); balance += win;
   spinCount++; balanceHistory.push(balance); resultFlags.push(win >= Number(costInput.value));
   const cls = win >= Number(costInput.value) ? 'result-win' : (win>0 ? 'result-small' : 'result-loss');
   resultText.className = cls; resultText.textContent = `Spin #${spinCount}: won ${fmtMoney(win)} (p≈${fmtPct(probs[idx])})`;
   balanceBox.value = fmtMoney(balance);
-  // highlight + big win FX
-  highlightIdx = idx; highlightUntil = Date.now() + 1200; drawWheel(); celebrateBigWin(win);
+
+  highlightIdx = idx; highlightUntil = Date.now() + 1200; drawWheel();
+  celebrateBigWin(win);
   updateGauge(); fullRedraw();
 }
+
 function spin(manual=true){
   if(spinning) return false;
   const c=Number(costInput.value);
@@ -506,20 +511,43 @@ function spin(manual=true){
   if(manual) animateSpinToIndex(idx, ()=>settleSpin(idx,win,true)); else settleSpin(idx,win,false);
   return true;
 }
+
 function autoRunTrials(total=500, speed=20){
-  let ct=0; clearInterval(autoRunInterval); stopButton.disabled=false; autoRunButton.disabled=true; spinButton.disabled=true; setProgress(true,0);
+  let ct=0;
+  clearInterval(autoRunInterval);
+  fxEnabled = false;                 // disable celebration FX during autorun
+  stopButton.disabled=false;
+  autoRunButton.disabled=true;
+  spinButton.disabled=true;
+  setProgress(true,0);
+
   autoRunInterval=setInterval(()=>{
     if(ct>=total || balance < Number(costInput.value)){
-      clearInterval(autoRunInterval); stopButton.disabled=true; autoRunButton.disabled=false; spinButton.disabled=false; setProgress(false,0);
-      if(balance < Number(costInput.value) && !insufficientFundsShown) alert("Insufficient funds"); insufficientFundsShown = balance < Number(costInput.value);
+      clearInterval(autoRunInterval);
+      fxEnabled = true;              // re-enable FX after autorun ends
+      stopButton.disabled=true;
+      autoRunButton.disabled=false;
+      spinButton.disabled=false;
+      setProgress(false,0);
+      if(balance < Number(costInput.value) && !insufficientFundsShown) alert("Insufficient funds");
+      insufficientFundsShown = balance < Number(costInput.value);
       return;
     }
-    spin(false); ct++; setProgress(true, ct/total);
+    spin(false);
+    ct++;
+    setProgress(true, ct/total);
   }, speed);
 }
-function stopAutoRun(){ clearInterval(autoRunInterval); stopButton.disabled=true; autoRunButton.disabled=false; spinButton.disabled=false; setProgress(false,0); }
+function stopAutoRun(){
+  clearInterval(autoRunInterval);
+  fxEnabled = true;                  // re-enable FX when stopped manually
+  stopButton.disabled=true;
+  autoRunButton.disabled=false;
+  spinButton.disabled=false;
+  setProgress(false,0);
+}
 
-/* ================== NAV / SETUP ================== */
+/* ---------- Nav / setup ---------- */
 function toSpinnerScreen(){
   document.getElementById('menuScreen').classList.add('hidden');
   document.getElementById('spinnerScreen').classList.remove('hidden');
@@ -548,7 +576,7 @@ function resetAll(){
   gctx.clearRect(0,0,graphCanvas.width,graphCanvas.height); updateGauge(); setProgress(false,0);
 }
 
-/* ================== EVENTS ================== */
+/* ---------- Events ---------- */
 addRowBtn.addEventListener('click', ()=>{ addRow(); autoRefreshKeyInfo(); renderDonut(); });
 tableBody.addEventListener('input', ()=>{ autoRefreshKeyInfo(); renderDonut(); });
 costInput.addEventListener('input', autoRefreshKeyInfo);
@@ -564,7 +592,7 @@ spinButton.addEventListener('click', ()=>spin(true));
 autoRunButton.addEventListener('click', ()=>autoRunTrials());
 stopButton.addEventListener('click', stopAutoRun);
 
-/* ================== INIT ================== */
+/* ---------- Init ---------- */
 resetAll(); buildWheelSegments(); drawWheel(); renderDonut();
 </script>
 </body>
