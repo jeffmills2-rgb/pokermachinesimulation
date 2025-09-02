@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Probability Spinner Simulator — Centered FX</title>
+<title>Probability Spinner Simulator — Clear Prizes</title>
 <style>
   :root{
     --bg:#ffffff; --fg:#111; --muted:#555; --border:#000;
@@ -77,9 +77,10 @@
   .valid-ok{ background:#eaf8ef; color:var(--ok); border-color:#0a7a3c; }
   .valid-bad{ background:#fde9eb; color:#b00020; border-color:#b00020; }
 
-  /* Add row pill + row count */
-  .table-actions{ display:flex; gap:12px; align-items:center; justify-content:center; margin-top:10px; }
-  #addRowBtn{ border-radius:999px; padding:10px 16px; font-weight:800; }
+  /* Add/Clear row actions + row count */
+  .table-actions{ display:flex; gap:12px; align-items:center; justify-content:center; margin-top:10px; flex-wrap:wrap; }
+  #addRowBtn, #clearRowsBtn{ border-radius:999px; padding:10px 16px; font-weight:800; }
+
   #rowCount{ font-weight:700; color:#333; }
 
   /* Preview card */
@@ -191,6 +192,7 @@
 
       <div class="table-actions">
         <button id="addRowBtn" aria-label="Add prize row">+ Add prize</button>
+        <button id="clearRowsBtn" aria-label="Clear all prize rows">Clear prizes</button>
         <div id="rowCount" aria-live="polite">0 rows</div>
       </div>
 
@@ -310,6 +312,7 @@ const spinnerScreen=document.getElementById('spinnerScreen');
 
 const tableBody=document.querySelector('#prizeTable tbody');
 const addRowBtn=document.getElementById('addRowBtn');
+const clearRowsBtn=document.getElementById('clearRowsBtn');
 const rowCount=document.getElementById('rowCount');
 
 const submitButton=document.getElementById('submitButton');
@@ -745,7 +748,7 @@ function resetAll(){
   clearKeyStats(); sumWarnAboveButtons.classList.add('hidden');
   rotation=0; wheelSegments=[]; drawWheel(); renderDonut();
   gctx.clearRect(0,0,graphCanvas.width,graphCanvas.height); updateGauge(); setProgress(false,0);
-  updateChecklistAndChips(); drawMenuWheel(); drawMenuDonut(); startMenuAnim();
+  updateRowCount(); updateChecklistAndChips(); drawMenuWheel(); drawMenuDonut(); startMenuAnim();
 }
 
 /* ================== PRESETS ================== */
@@ -769,6 +772,11 @@ document.getElementById('presetFrequent').addEventListener('click',()=>applyPres
 document.getElementById('presetVolatile').addEventListener('click',()=>applyPreset('volatile'));
 
 addRowBtn.addEventListener('click', ()=>{ addRow(); onMenuInputsChanged(); });
+clearRowsBtn.addEventListener('click', ()=>{
+  tableBody.innerHTML = '';                // clear all rows
+  updateRowCount();                         // show 0 rows
+  onMenuInputsChanged();                    // refresh previews + validity/warnings
+});
 tableBody.addEventListener('input', onMenuInputsChanged);
 costInput.addEventListener('input', onMenuInputsChanged);
 balanceInput.addEventListener('input', onMenuInputsChanged);
