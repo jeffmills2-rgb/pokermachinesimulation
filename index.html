@@ -3,19 +3,15 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Probability Spinner Simulator (Centered + Auto-update)</title>
+<title>Probability Spinner Simulator (Centered + Wheel)</title>
 <style>
   :root {
     --fg:#111; --muted:#555; --border:#000; --accent:#1b5e20; --warn:#b00020;
-    --table-w: 640px; /* make wider/narrower if you like */
+    --table-w: 640px; /* adjust table width if desired */
   }
 
   /* Center the whole program */
-  .app {
-    width: min(100%, 980px);
-    margin: 0 auto;
-    padding: 0 12px;
-  }
+  .app { width: min(100%, 980px); margin: 0 auto; padding: 0 12px; }
 
   body { font-family: Arial, sans-serif; color:var(--fg); margin:24px 0; line-height:1.35; }
   h1 { font-size: 34px; margin: 0 0 16px; }
@@ -50,10 +46,9 @@
   .pwbox { display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap; }
   .pwbox input { width: 240px; }
 
-  @media (max-width: 720px) {
-    .table-wrap { width: 100%; }
-    th, td { padding:14px; }
-  }
+  /* Wheel layout */
+  .wheel-wrap { display:flex; justify-content:center; margin-top:12px; }
+  #wheelCanvas { border-radius: 50%; border:3px solid #000; background:#fff; }
 </style>
 </head>
 <body>
@@ -129,6 +124,11 @@
         <button id="stopButton" disabled>Stop</button>
       </div>
 
+      <!-- NEW: Spinner wheel -->
+      <div class="wheel-wrap">
+        <canvas id="wheelCanvas" width="420" height="420"></canvas>
+      </div>
+
       <p id="resultText" class="ok"></p>
       <div class="row">
         <label>Balance:</label>
@@ -151,6 +151,11 @@ let balanceHistory = [];
 let autoRunInterval = null;
 let insufficientFundsShown = false;
 let autorunning = false;
+
+/* Wheel state */
+let wheelSegments = [];   // [{start,end,label,color}]
+let rotation = 0;         // current wheel rotation (radians)
+let spinning = false;
 
 /* ---------- Elements ---------- */
 const tableBody = document.querySelector('#prizeTable tbody');
@@ -188,9 +193,19 @@ const canvas = document.getElementById('balanceGraph');
 const ctx = canvas.getContext('2d');
 const spinSound = document.getElementById('spinSound');
 
+/* Wheel canvas */
+const wheelCanvas = document.getElementById('wheelCanvas');
+const wctx = wheelCanvas.getContext('2d');
+const W = wheelCanvas.width, H = wheelCanvas.height;
+const CX = W/2, CY = H/2;
+const R = Math.min(W, H)/2 - 24; // wheel radius
+
 /* ---------- Helpers ---------- */
 function fmtMoney(n){ return Number(n).toFixed(2); }
 function fmtPct(n){ return (Number(n)*100).toFixed(2) + "%"; }
+const TAU = Math.PI*2;
+const modTau = a => ((a % TAU) + TAU) % TAU;
+function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
 
 function addRow(v = "", p = "") {
   const tr = document.createElement('tr');
@@ -294,15 +309,139 @@ function autoRefreshKeyInfo(){
   }
 }
 
+/* ---------- Wheel drawing & animation ---------- */
+const palette = [
+  "#f44336","#e91e63","#9c27b0","#673ab7","#3f51b5","#2196f3",
+  "#03a9f4","#00bcd4","#009688","#4caf50","#8bc34a","#cddc39",
+  "#ffeb3b","#ffc107","#ff9800","#ff5722"
+];
+
+function buildWheelSegments(){
+  wheelSegments = [];
+  let a = 0;
+  for (let i=0;i<probs.length;i++){
+    const span = probs[i]*TAU;
+    const start = a;
+    const end = a + span;
+    a = end;
+    wheelSegments.push({
+      start, end,
+      label: fmtMoney(values[i]),
+      color: palette[i % palette.length]
+    });
+  }
+  rotation = modTau(rotation); // keep clean
+}
+
+function drawWheel(){
+  // clear
+  wctx.clearRect(0,0,W,H);
+
+  // segments
+  wheelSegments.forEach(seg=>{
+    wctx.beginPath();
+    wctx.moveTo(CX,CY);
+    wctx.fillStyle = seg.color;
+    wctx.arc(CX,CY,R, seg.start + rotation, seg.end + rotation);
+    wctx.closePath();
+    wctx.fill();
+    wctx.strokeStyle = "#000";
+    wctx.lineWidth = 2;
+    wctx.stroke();
+  });
+
+  // labels (skip very tiny slices)
+  wctx.fillStyle = "#000";
+  wctx.font = "16px Arial";
+  wctx.textAlign = "center";
+  wctx.textBaseline = "middle";
+  wheelSegments.forEach(seg=>{
+    const span = seg.end - seg.start;
+    if (span < 0.06) return; // ~3.4°—too tiny to label
+    const mid = (seg.start + seg.end)/2 + rotation;
+    const rx = CX + Math.cos(mid) * (R * 0.62);
+    const ry = CY + Math.sin(mid) * (R * 0.62);
+    wctx.fillText(seg.label, rx, ry);
+  });
+
+  // center cap
+  wctx.beginPath();
+  wctx.arc(CX,CY, 20, 0, TAU);
+  wctx.fillStyle = "#fff";
+  wctx.fill();
+  wctx.strokeStyle="#000";
+  wctx.lineWidth=2;
+  wctx.stroke();
+
+  // pointer (top)
+  drawPointer();
+}
+
+function drawPointer(){
+  const tipX = CX, tipY = CY - R - 8;
+  const baseLx = CX - 16, baseLy = CY - R - 42;
+  const baseRx = CX + 16, baseRy = CY - R - 42;
+  wctx.beginPath();
+  wctx.moveTo(tipX, tipY);
+  wctx.lineTo(baseLx, baseLy);
+  wctx.lineTo(baseRx, baseRy);
+  wctx.closePath();
+  wctx.fillStyle = "#000";
+  wctx.fill();
+  wctx.strokeStyle = "#000";
+  wctx.lineWidth = 2;
+  wctx.stroke();
+}
+
+function segmentMidAngle(idx){
+  const seg = wheelSegments[idx];
+  return (seg.start + seg.end)/2;
+}
+
+function animateSpinToIndex(idx, onDone){
+  if (!wheelSegments.length) { if (onDone) onDone(); return; }
+  spinning = true;
+  spinButton.disabled = true;
+  autoRunButton.disabled = true;
+  backButton.disabled = true;
+
+  const pointerAngle = -Math.PI/2; // top
+  const midBase = segmentMidAngle(idx); // base geometry (no rotation)
+  const deltaToAlign = modTau(pointerAngle - (midBase + rotation)); // how much more to rotate to center target
+  const extraTurns = 4; // full spins for drama
+  const finalRotation = rotation + extraTurns*TAU + deltaToAlign;
+
+  const duration = 3000; // ms
+  const start = performance.now();
+  const startRot = rotation;
+  function step(ts){
+    const t = Math.min(1, (ts - start) / duration);
+    const eased = easeOutCubic(t);
+    rotation = startRot + (finalRotation - startRot) * eased;
+    drawWheel();
+    if (t < 1) requestAnimationFrame(step);
+    else {
+      rotation = modTau(finalRotation);
+      drawWheel();
+      spinning = false;
+      spinButton.disabled = false;
+      autoRunButton.disabled = false;
+      backButton.disabled = false;
+      if (onDone) onDone();
+    }
+  }
+  requestAnimationFrame(step);
+}
+
 /* ---------- Graph ---------- */
 function drawGraph(animatedIndex = balanceHistory.length - 1){
-  const W = canvas.width, H = canvas.height;
+  const Wg = canvas.width, Hg = canvas.height;
   const left = 70, right = 24, top = 46, bottom = 46;
-  const plotW = W - left - right, plotH = H - top - bottom;
+  const plotW = Wg - left - right, plotH = Hg - top - bottom;
 
-  ctx.clearRect(0,0,W,H);
+  ctx.clearRect(0,0,Wg,Hg);
   ctx.font = "22px Arial"; ctx.textAlign="center"; ctx.fillStyle="#000";
-  ctx.fillText("Balance over time", W/2, 32);
+  ctx.fillText("Balance over time", Wg/2, 32);
 
   ctx.strokeStyle = "#000"; ctx.lineWidth = 3; ctx.strokeRect(left, top, plotW, plotH);
 
@@ -357,22 +496,42 @@ function weightedPick(){
 }
 function setAutorun(run){
   autorunning = run;
-  autoRunButton.disabled = run; spinButton.disabled = run; stopButton.disabled = !run;
+  autoRunButton.disabled = run; spinButton.disabled = run || spinning; stopButton.disabled = !run;
 }
-function spin(manual=true){
-  const c = Number(costInput.value);
-  if (balance < c){ if(!insufficientFundsShown && manual) alert("Insufficient funds"); insufficientFundsShown=true; return false; }
-  if (manual){ try{ spinSound.currentTime=0; spinSound.play(); }catch(e){} }
 
-  const idx = weightedPick(), win = values[idx];
-  balance -= c; balance += win; spinCount++; balanceHistory.push(balance);
-
+function settleSpin(idx, win, manual){
+  // apply result & update UI/graph
+  balance -= Number(costInput.value);
+  balance += win;
+  spinCount++;
+  balanceHistory.push(balance);
   resultText.textContent = `Spin #${spinCount}: won ${fmtMoney(win)} (p≈${fmtPct(probs[idx])})`;
   balanceBox.value = fmtMoney(balance);
-
   if (manual) animateGraph(); else drawGraph();
+}
+
+function spin(manual=true){
+  if (spinning) return false;
+  const c = Number(costInput.value);
+  if (balance < c){
+    if(!insufficientFundsShown && manual) alert("Insufficient funds");
+    insufficientFundsShown = true;
+    return false;
+  }
+  if (manual){ try{ spinSound.currentTime=0; spinSound.play(); }catch(e){} }
+
+  const idx = weightedPick();
+  const win = values[idx];
+
+  if (manual){
+    animateSpinToIndex(idx, ()=> settleSpin(idx, win, true));
+  } else {
+    // no animation for autorun
+    settleSpin(idx, win, false);
+  }
   return true;
 }
+
 function autoRunTrials(total=500, speed=20){
   let ct=0; clearInterval(autoRunInterval); setAutorun(true);
   autoRunInterval = setInterval(()=>{
@@ -388,8 +547,17 @@ function autoRunTrials(total=500, speed=20){
 function stopAutoRun(){ clearInterval(autoRunInterval); setAutorun(false); }
 
 /* ---------- Navigation / setup ---------- */
-function toSpinnerScreen(){ document.getElementById('menuScreen').classList.add('hidden'); document.getElementById('spinnerScreen').classList.remove('hidden'); }
-function toMenuScreen(){ document.getElementById('spinnerScreen').classList.add('hidden'); document.getElementById('menuScreen').classList.remove('hidden'); }
+function toSpinnerScreen(){
+  document.getElementById('menuScreen').classList.add('hidden');
+  document.getElementById('spinnerScreen').classList.remove('hidden');
+  // fresh wheel draw
+  buildWheelSegments();
+  drawWheel();
+}
+function toMenuScreen(){
+  document.getElementById('spinnerScreen').classList.add('hidden');
+  document.getElementById('menuScreen').classList.remove('hidden');
+}
 
 function submit(){
   if (!percentagesSumTo100()){
@@ -429,6 +597,10 @@ function resetAll(){
   pwMsg.textContent = "";
   clearKeyStats();
   sumWarnAboveButtons.classList.add('hidden');
+
+  // reset wheel
+  rotation = 0; wheelSegments = [];
+  drawWheel();
 }
 
 /* ---------- Events ---------- */
@@ -461,8 +633,10 @@ spinButton.addEventListener('click', ()=>spin(true));
 autoRunButton.addEventListener('click', ()=>autoRunTrials());
 stopButton.addEventListener('click', stopAutoRun);
 
-/* Initial rows */
+/* Initial rows + initial blank wheel draw */
 resetAll();
+buildWheelSegments();
+drawWheel();
 </script>
 </body>
 </html>
