@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Probability Spinner Simulator — Clear Prizes</title>
+<title>Probability Spinner Simulator — Clear & Blank Start</title>
 <style>
   :root{
     --bg:#ffffff; --fg:#111; --muted:#555; --border:#000;
@@ -155,9 +155,9 @@
       <div class="section-title"><span class="icon" aria-hidden="true">🎛️</span><h2>Game settings</h2></div>
       <div class="row center spaced">
         <label for="costInput">Cost per spin:</label>
-        <input type="number" id="costInput" min="0.01" step="0.01" value="25" aria-describedby="costHelp">
+        <input type="number" id="costInput" min="0.01" step="0.01" value="" placeholder="e.g., 25" aria-describedby="costHelp">
         <label for="balanceInput">Starting balance:</label>
-        <input type="number" id="balanceInput" min="0.01" step="0.01" value="10000" aria-describedby="balanceHelp">
+        <input type="number" id="balanceInput" min="0.01" step="0.01" value="" placeholder="e.g., 10000" aria-describedby="balanceHelp">
       </div>
       <div class="row center note" id="costHelp">Must be positive numbers.</div>
     </div>
@@ -742,8 +742,9 @@ function submit(){
   toSpinnerScreen(); balanceBox.value=fmtMoney(balance); costInfo.textContent=`Cost per spin: ${fmtMoney(cost)}`;
 }
 function resetAll(){
-  tableBody.innerHTML=''; addRow(0,60); addRow(5,30); addRow(45,10);
-  costInput.value=25; balanceInput.value=10000;
+  tableBody.innerHTML='';           // no preloaded rows
+  costInput.value="";               // blank cost
+  balanceInput.value="";            // blank balance
   keyInfo.classList.add('hidden'); pwGate.classList.add('hidden'); pwInput.value=""; pwMsg.textContent="";
   clearKeyStats(); sumWarnAboveButtons.classList.add('hidden');
   rotation=0; wheelSegments=[]; drawWheel(); renderDonut();
@@ -773,9 +774,10 @@ document.getElementById('presetVolatile').addEventListener('click',()=>applyPres
 
 addRowBtn.addEventListener('click', ()=>{ addRow(); onMenuInputsChanged(); });
 clearRowsBtn.addEventListener('click', ()=>{
+  if (!confirm("Clear all prize rows? This cannot be undone.")) return;
   tableBody.innerHTML = '';                // clear all rows
-  updateRowCount();                         // show 0 rows
-  onMenuInputsChanged();                    // refresh previews + validity/warnings
+  updateRowCount();                        // show 0 rows
+  onMenuInputsChanged();                   // refresh previews + validity/warnings
 });
 tableBody.addEventListener('input', onMenuInputsChanged);
 costInput.addEventListener('input', onMenuInputsChanged);
@@ -809,7 +811,7 @@ document.addEventListener('keydown',(e)=>{
 });
 
 /* ================== INIT ================== */
-resetAll();  // sets defaults, draws previews, starts slow rotation
+resetAll();  // now starts with BLANK inputs and EMPTY table
 
 /* Auto-update key info when totals valid/invalid */
 function autoRefreshKeyInfo(){
