@@ -124,7 +124,7 @@
         <button id="stopButton" disabled>Stop</button>
       </div>
 
-      <!-- NEW: Spinner wheel -->
+      <!-- Spinner wheel -->
       <div class="wheel-wrap">
         <canvas id="wheelCanvas" width="420" height="420"></canvas>
       </div>
@@ -320,7 +320,7 @@ function buildWheelSegments(){
   wheelSegments = [];
   let a = 0;
   for (let i=0;i<probs.length;i++){
-    const span = probs[i]*TAU;
+    const span = probs[i]*Math.PI*2;
     const start = a;
     const end = a + span;
     a = end;
@@ -366,7 +366,7 @@ function drawWheel(){
 
   // center cap
   wctx.beginPath();
-  wctx.arc(CX,CY, 20, 0, TAU);
+  wctx.arc(CX,CY, 20, 0, Math.PI*2);
   wctx.fillStyle = "#fff";
   wctx.fill();
   wctx.strokeStyle="#000";
@@ -409,7 +409,7 @@ function animateSpinToIndex(idx, onDone){
   const midBase = segmentMidAngle(idx); // base geometry (no rotation)
   const deltaToAlign = modTau(pointerAngle - (midBase + rotation)); // how much more to rotate to center target
   const extraTurns = 4; // full spins for drama
-  const finalRotation = rotation + extraTurns*TAU + deltaToAlign;
+  const finalRotation = rotation + extraTurns*Math.PI*2 + deltaToAlign;
 
   const duration = 3000; // ms
   const start = performance.now();
@@ -500,7 +500,6 @@ function setAutorun(run){
 }
 
 function settleSpin(idx, win, manual){
-  // apply result & update UI/graph
   balance -= Number(costInput.value);
   balance += win;
   spinCount++;
@@ -526,7 +525,6 @@ function spin(manual=true){
   if (manual){
     animateSpinToIndex(idx, ()=> settleSpin(idx, win, true));
   } else {
-    // no animation for autorun
     settleSpin(idx, win, false);
   }
   return true;
@@ -550,13 +548,18 @@ function stopAutoRun(){ clearInterval(autoRunInterval); setAutorun(false); }
 function toSpinnerScreen(){
   document.getElementById('menuScreen').classList.add('hidden');
   document.getElementById('spinnerScreen').classList.remove('hidden');
-  // fresh wheel draw
   buildWheelSegments();
   drawWheel();
 }
 function toMenuScreen(){
   document.getElementById('spinnerScreen').classList.add('hidden');
   document.getElementById('menuScreen').classList.remove('hidden');
+
+  /* NEW: Re-lock key info when returning to menu */
+  keyInfo.classList.add('hidden');     // hide revealed info
+  pwGate.classList.add('hidden');      // hide the password strip
+  pwInput.value = "";                  // clear the password field
+  pwMsg.textContent = "";              // clear status message
 }
 
 function submit(){
@@ -598,7 +601,6 @@ function resetAll(){
   clearKeyStats();
   sumWarnAboveButtons.classList.add('hidden');
 
-  // reset wheel
   rotation = 0; wheelSegments = [];
   drawWheel();
 }
