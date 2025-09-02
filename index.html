@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Probability Spinner Simulator — Enhanced Menu</title>
+<title>Probability Spinner Simulator — Centered FX</title>
 <style>
   :root{
     --bg:#ffffff; --fg:#111; --muted:#555; --border:#000;
@@ -54,7 +54,7 @@
   }
   #startButton:active{ transform:translateY(2px); box-shadow:0 6px 0 #000, 0 8px 12px rgba(0,0,0,.25); }
 
-  /* Settings & Prizes cards */
+  /* Section headers */
   .section-title{ display:flex; align-items:center; gap:10px; margin-bottom:10px; }
   .section-title .icon{ font-size:24px; }
   .spaced{ margin-top:6px; margin-bottom:6px; }
@@ -87,7 +87,7 @@
   canvas{ border:3px solid var(--border); border-radius:12px; background:#fff; }
   #menuWheelCanvas{ border-radius:50%; background:#fff; }
 
-  /* Spinner screen (unchanged visuals) */
+  /* Spinner screen */
   #spinButton{
     width:110px; height:110px; border-radius:999px; font-size:24px; font-weight:700;
     background: radial-gradient(circle at 30% 30%, #fff, #e6eef8); border-width:4px;
@@ -104,7 +104,15 @@
   .pwbox{ display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap; justify-content:center; }
   .pwbox input{ width:240px; }
 
-  /* Celebration FX (unchanged logic; disabled during autorun) */
+  /* --- Centered FX layer for wheel --- */
+  .wheel-panel{ position:relative; } /* positioning context */
+  .fx-layer{
+    position:absolute; left:50%; top:50%;
+    transform:translate(-50%,-50%); /* center on wheel */
+    width:0; height:0; pointer-events:none; z-index:5;
+  }
+
+  /* Celebration FX */
   .coin{ position:absolute; font-size:28px; filter:drop-shadow(0 2px 1px rgba(0,0,0,.35)); animation:coinUp 1400ms ease-out forwards; }
   @keyframes coinUp{
     0%{ transform:translate(0,0) scale(.7) rotate(0deg); opacity:0; }
@@ -128,7 +136,7 @@
 <body>
 <div class="app">
   <!-- HERO -->
-  <div class="card hero" role="banner" aria-label="Welcome">
+  <div class="card hero" role="banner" aria-label="Welcome" id="heroCard">
     <h1>Probability Spinner Simulator</h1>
     <div class="subtitle">Set your game, add prizes, preview the distribution — then spin!</div>
     <div class="steps" aria-live="polite">
@@ -234,7 +242,7 @@
     </div>
   </div>
 
-  <!-- SPINNER (unchanged core layout/logic) -->
+  <!-- SPINNER -->
   <div id="spinnerScreen" class="card hidden" aria-label="Spinner screen">
     <div class="row center" style="gap:12px;">
       <button id="backButton">Back to Menu</button>
@@ -244,7 +252,7 @@
     </div>
 
     <div class="row center">
-      <div class="wheel-panel" style="position:relative;">
+      <div class="wheel-panel">
         <div class="fx-layer" id="effects"></div>
         <canvas id="wheelCanvas" width="420" height="420" aria-label="Prize wheel"></canvas>
       </div>
@@ -296,6 +304,7 @@ let fxEnabled = true; // disable celebration FX during autorun
 let menuRot=0, menuAnimId=null;
 
 /* ================== ELEMENTS ================== */
+const heroCard=document.getElementById('heroCard');
 const menuScreen=document.getElementById('menuScreen');
 const spinnerScreen=document.getElementById('spinnerScreen');
 
@@ -550,6 +559,28 @@ function drawWheel(){
     wctx.restore();
   }
 }
+
+function segmentMidAngle(idx){ const seg=wheelSegments[idx]; return (seg.start+seg.end)/2; }
+function animateSpinToIndex(idx,onDone){
+  if(!wheelSegments.length){ onDone&&onDone(); return; }
+  spinning=true; spinButton.disabled=true; autoRunButton.disabled=true; backButton.disabled=true;
+  const pointerAngle=-Math.PI/2; // up
+  const midBase=segmentMidAngle(idx);
+  const delta=modTau(pointerAngle - (midBase + rotation));
+  const finalRotation=rotation + 4*TAU + delta; // 4 full spins + align
+  const duration=3000, start=performance.now(), startRot=rotation;
+  const step=(ts)=>{
+    const t=Math.min(1,(ts-start)/duration), eased=easeOutCubic(t);
+    rotation=startRot + (finalRotation-startRot)*eased; drawWheel();
+    if(t<1) requestAnimationFrame(step); else{
+      rotation=modTau(finalRotation); drawWheel(); spinning=false;
+      spinButton.disabled=false; autoRunButton.disabled=false; backButton.disabled=false;
+      onDone&&onDone();
+    }
+  };
+  requestAnimationFrame(step);
+}
+
 function renderDonut(){
   const {pcts}=getRows(); const probsLocal=pcts.map(v=>v/100);
   dctx.clearRect(0,0,donutCanvas.width,donutCanvas.height);
@@ -650,6 +681,13 @@ function settleSpin(idx,win,manual){
   updateGauge(); fullRedraw();
 }
 function spin(manual=true){
+  // Defensive rebuild if needed
+  if (!wheelSegments.length || !cdf.length || !values.length) {
+    buildDistributionFromTable();
+    buildWheelSegments();
+    drawWheel();
+  }
+
   if(spinning) return false;
   const c=Number(costInput.value);
   if(balance < c){ if(!insufficientFundsShown && manual) alert("Insufficient funds"); insufficientFundsShown=true; return false; }
@@ -678,14 +716,17 @@ function stopAutoRun(){ clearInterval(autoRunInterval); fxEnabled = true; stopBu
 
 /* ================== NAVIGATION ================== */
 function toSpinnerScreen(){
+  heroCard.classList.add('hidden');
   menuScreen.classList.add('hidden');
   spinnerScreen.classList.remove('hidden');
+
   cancelMenuAnim();
   buildDistributionFromTable(); buildWheelSegments(); drawWheel(); renderDonut(); updateGauge(); fullRedraw();
 }
 function toMenuScreen(){
   spinnerScreen.classList.add('hidden');
   menuScreen.classList.remove('hidden');
+  heroCard.classList.remove('hidden');
   keyInfo.classList.add('hidden'); pwGate.classList.add('hidden'); pwInput.value=""; pwMsg.textContent="";
   startMenuAnim(); drawMenuWheel(); drawMenuDonut(); updateChecklistAndChips();
 }
@@ -748,8 +789,7 @@ stopButton.addEventListener('click', stopAutoRun);
 document.addEventListener('keydown',(e)=>{
   // Ctrl/Cmd+Enter to submit (on menu only)
   if((e.ctrlKey || e.metaKey) && e.key==='Enter' && !spinnerScreen.classList.contains('hidden')){
-    // ignore on spinner
-    return;
+    return; // ignore on spinner
   }
   if((e.ctrlKey || e.metaKey) && e.key==='Enter' && !menuScreen.classList.contains('hidden')){
     e.preventDefault(); submit();
@@ -762,6 +802,21 @@ document.addEventListener('keydown',(e)=>{
 
 /* ================== INIT ================== */
 resetAll();  // sets defaults, draws previews, starts slow rotation
+
+/* Auto-update key info when totals valid/invalid */
+function autoRefreshKeyInfo(){
+  const ok = percentagesSumTo100();
+  if (!ok) {
+    document.getElementById('keyWarn').classList.remove('hidden');
+    document.getElementById('sumWarnAboveButtons').classList.remove('hidden');
+    document.getElementById('keyStatsBlock').classList.add('hidden');
+    return;
+  }
+  document.getElementById('keyWarn').classList.add('hidden');
+  document.getElementById('sumWarnAboveButtons').classList.add('hidden');
+  document.getElementById('keyStatsBlock').classList.remove('hidden');
+  buildDistributionFromTable(); renderKeyStats();
+}
 </script>
 </body>
 </html>
