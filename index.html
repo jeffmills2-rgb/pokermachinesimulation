@@ -3,60 +3,106 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Probability Spinner Simulator (Wheel + Clean Line)</title>
+<title>Probability Spinner Simulator — Visual+</title>
 <style>
-  :root {
-    --fg:#111; --muted:#555; --border:#000; --accent:#1b5e20; --warn:#b00020;
-    --table-w: 640px; /* adjust table width if desired */
+  /* ===== Light theme tokens (color-blind-safe slices kept) ===== */
+  :root{
+    --bg:#ffffff; --fg:#111; --muted:#555; --border:#000;
+    --card:#ffffff; --shadow:0 6px 18px rgba(0,0,0,.10);
+    --accent:#0b72b9; --warn:#b00020; --ok:#0a7a3c; --amber:#a66b00;
+    --wheel-rim:#111; --progress-bg:#e6e6e6; --progress-fg:#0b72b9;
   }
 
-  /* Center the whole program */
-  .app { width: min(100%, 980px); margin: 0 auto; padding: 0 12px; }
+  /* ===== Base layout ===== */
+  body{ background:var(--bg); color:var(--fg); font-family:Arial, Helvetica, sans-serif; margin:24px 0; }
+  .app{ width:min(100%, 1100px); margin:0 auto; padding:0 14px; }
+  h1{ font-size:34px; margin:0 0 16px; text-align:center; }
+  h3{ font-size:22px; margin:18px 0 8px; text-align:center; }
+  .hidden{ display:none; }
+  .row{ display:flex; gap:18px; align-items:center; flex-wrap:wrap; margin:12px 0; }
 
-  body { font-family: Arial, sans-serif; color:var(--fg); margin:24px 0; line-height:1.35; }
-  h1 { font-size: 34px; margin: 0 0 16px; }
-  h3 { font-size: 22px; margin: 18px 0 8px; }
-  .hidden { display:none; }
-
-  input, button, label { font-size:18px; }
-  input[type="number"], input[type="text"], input[type="password"] {
-    padding:10px 12px; border:2px solid #000; border-radius:12px;
-    height:44px; line-height:44px; box-sizing: border-box; background:#fff;
+  input, button, label{ font-size:18px; }
+  input[type="number"], input[type="text"], input[type="password"]{
+    padding:10px 12px; border:2px solid var(--border); border-radius:12px;
+    height:44px; line-height:44px; box-sizing:border-box; background:#fff; color:#111;
   }
-  button { padding:10px 16px; margin:10px 12px 0 0; border:3px solid #000; border-radius:12px; background:#fff; }
-  .note { color:var(--muted); font-size:14px; }
-  .warn { color: var(--warn); font-size:16px; margin-top:8px; }
-  .row { display:flex; gap:18px; align-items:center; flex-wrap:wrap; margin:12px 0; }
-  .controls { margin-top:14px; }
+  button{
+    padding:10px 16px; border:3px solid var(--border); border-radius:12px;
+    background:var(--card); color:var(--fg); box-shadow:var(--shadow);
+    cursor:pointer;
+  }
+  button:disabled{ opacity:.55; cursor:not-allowed; }
 
-  /* Rounded, thick-bordered table */
-  .table-wrap { width: min(100%, var(--table-w)); }
-  table { width:100%; border-collapse: separate; border-spacing: 0;
-          border-radius: 18px; overflow: hidden; background:#fff; }
-  th, td { border:4px solid var(--border); padding:16px; text-align:center; }
-  th { background:#f4f6f9; font-size:22px; font-weight:700; }
-  td input { width:100%; margin: 2px 0; }
-  tfoot td { border: none; padding: 12px 0 0; }
+  .card{ background:var(--card); border:2px solid var(--border); border-radius:16px; box-shadow:var(--shadow); padding:16px; margin:16px 0; }
 
-  .stats { margin-top:12px; font-size:16px; }
-  .stats strong { color:#000; }
-  canvas { border:3px solid #000; margin-top:18px; max-width:100%; height:auto; border-radius:12px; }
-  .ok { color:var(--accent); font-weight:700; }
+  /* ===== Table (wider, fixed layout, no overlap) ===== */
+  .table-wrap{ width:min(100%, 780px); margin:0 auto; }
+  table{ width:100%; border-collapse:separate; border-spacing:0; border-radius:18px; overflow:hidden; background:#fff;
+         table-layout:fixed; }
+  th, td{ border:4px solid #000; padding:12px 14px; text-align:center; }
+  th{ background:#f4f6f9; font-size:22px; font-weight:700; }
+  td input{ width:100%; max-width:100%; margin:2px 0; box-sizing:border-box; }
 
-  .pwbox { display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap; }
-  .pwbox input { width: 240px; }
+  .note{ color:var(--muted); font-size:14px; text-align:center; }
+  .warn{ color:var(--warn); font-size:16px; margin-top:8px; text-align:center; }
 
-  /* Wheel layout */
-  .wheel-wrap { display:flex; justify-content:center; margin-top:12px; }
-  #wheelCanvas { border-radius: 50%; border:3px solid #000; background:#fff; }
+  /* ===== Spinner + controls ===== */
+  .flex-split{ display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap; justify-content:center; }
+  .wheel-panel{ position:relative; display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .mini-panel{ display:flex; flex-direction:column; gap:12px; }
+  .fx-layer{ position:absolute; inset:0; pointer-events:none; display:flex; align-items:center; justify-content:center; }
+
+  canvas{ border:3px solid var(--border); border-radius:12px; background:#fff; }
+  #wheelCanvas{ border-radius:50%; background:#fff; }
+  #donutCanvas{ width:180px; height:180px; }
+
+  /* Big round Spin button */
+  #spinButton{
+    width:110px; height:110px; border-radius:999px; font-size:24px; font-weight:700;
+    background: radial-gradient(circle at 30% 30%, #fff, #e6eef8); border-width:4px;
+    box-shadow: 0 8px 0 #000, 0 12px 18px rgba(0,0,0,.25);
+  }
+  #spinButton:active{ transform:translateY(2px); box-shadow:0 6px 0 #000, 0 8px 12px rgba(0,0,0,.25); }
+
+  /* Progress bar */
+  .progress{ width:min(100%, 900px); height:12px; background:var(--progress-bg); border-radius:999px; overflow:hidden; border:2px solid var(--border); }
+  .progress-bar{ height:100%; width:0%; background:var(--progress-fg); transition:width .15s linear; }
+
+  /* Result coloring */
+  .result-win{ color:var(--ok); }
+  .result-small{ color:var(--amber); }
+  .result-loss{ color:var(--warn); }
+
+  /* Balance gauge */
+  .gauge{ width:300px; height:16px; background:var(--progress-bg); border:2px solid var(--border); border-radius:999px; overflow:hidden; margin:0 auto; }
+  .gauge-fill{ height:100%; width:100%; background:linear-gradient(90deg, #34d399, #4dabf7); transition:width .25s ease; }
+
+  /* Password row */
+  .pwbox{ display:flex; gap:10px; align-items:center; margin-top:8px; flex-wrap:wrap; justify-content:center; }
+  .pwbox input{ width:240px; }
+
+  /* Coin burst + popup */
+  .coin{ position:absolute; font-size:20px; filter:drop-shadow(0 2px 1px rgba(0,0,0,.35)); animation:coinUp 900ms ease-out forwards; }
+  @keyframes coinUp{
+    0%{ transform:translate(0,0) scale(.8); opacity:0; }
+    20%{ opacity:1; }
+    100%{ transform:translate(var(--tx), var(--ty)) scale(1.1); opacity:0; }
+  }
+  .popup{ position:absolute; font-size:22px; font-weight:800; color:var(--ok); animation:popFloat 1100ms ease-out forwards;}
+  @keyframes popFloat{
+    0%{ transform:translateY(0); opacity:0; }
+    15%{ opacity:1; }
+    100%{ transform:translateY(-70px); opacity:0; }
+  }
 </style>
 </head>
 <body>
   <div class="app">
     <h1>Welcome to the Probability Spinner Simulator</h1>
 
-    <div id="menuScreen">
-      <div class="row">
+    <!-- MENU -->
+    <div id="menuScreen" class="card">
+      <div class="row" style="justify-content:center;">
         <label for="costInput">Cost per spin:</label>
         <input type="number" id="costInput" min="0.01" step="0.01" value="25">
         <label for="balanceInput">Starting balance:</label>
@@ -67,27 +113,33 @@
 
       <div class="table-wrap">
         <table id="prizeTable" aria-label="Prize and percentage table">
+          <!-- fixed column widths to prevent overlap -->
+          <colgroup>
+            <col style="width:40%;">
+            <col style="width:40%;">
+            <col style="width:20%;">
+          </colgroup>
           <thead>
             <tr>
               <th>Prize</th>
               <th>Percentage chance</th>
-              <th style="width:140px;">Row</th>
+              <th>Row</th>
             </tr>
           </thead>
           <tbody><!-- rows inserted by JS --></tbody>
           <tfoot>
-            <tr>
-              <td colspan="3" class="note">Percentages must total 100%.</td>
-            </tr>
+            <tr><td colspan="3" class="note">Percentages must total 100%.</td></tr>
           </tfoot>
         </table>
       </div>
 
       <div id="sumWarnAboveButtons" class="warn hidden">% does not total 100</div>
 
-      <button id="addRowBtn">Add row</button>
+      <div class="row" style="justify-content:center;">
+        <button id="addRowBtn">Add row</button>
+      </div>
 
-      <div class="controls">
+      <div class="row" style="justify-content:center;">
         <button id="revealKeyBtn">Reveal key information</button>
         <button id="submitButton">Submit</button>
         <button id="resetButton">Reset</button>
@@ -103,557 +155,407 @@
         </div>
       </div>
 
-      <div id="keyInfo" class="hidden" aria-live="polite">
+      <div id="keyInfo" class="hidden" aria-live="polite" style="margin-top:10px;">
         <div id="keyWarn" class="warn hidden">% does not total 100</div>
-
         <div id="keyStatsBlock">
-          <div class="row" style="margin-top:14px;">
+          <div class="row" style="justify-content:center; margin-top:14px;">
             <span><strong>Average prize:</strong> <input type="text" id="avgPrize" readonly style="width:160px;"></span>
             <span><strong>Average RTP:</strong> <input type="text" id="avgRTP" readonly style="width:160px;"></span>
           </div>
-          <div class="stats" id="theoryStats"></div>
+          <div class="note" id="theoryStats"></div>
         </div>
       </div>
     </div>
 
-    <div id="spinnerScreen" class="hidden">
-      <div class="controls">
+    <!-- SPINNER -->
+    <div id="spinnerScreen" class="card hidden">
+      <div class="row" style="justify-content:center; gap:12px;">
         <button id="backButton">Back to Menu</button>
-        <button id="spinButton">Spin</button>
+        <button id="spinButton" title="Spin!">Spin</button>
         <button id="autoRunButton">Run 500 Trials</button>
         <button id="stopButton" disabled>Stop</button>
       </div>
 
-      <!-- Spinner wheel -->
-      <div class="wheel-wrap">
-        <canvas id="wheelCanvas" width="420" height="420"></canvas>
+      <div class="flex-split">
+        <div class="wheel-panel">
+          <div class="fx-layer" id="effects"></div>
+          <canvas id="wheelCanvas" width="420" height="420" aria-label="Prize wheel"></canvas>
+        </div>
+        <div class="mini-panel">
+          <div style="text-align:center;"><strong>Payout distribution</strong></div>
+          <canvas id="donutCanvas" width="180" height="180" aria-label="Payout distribution donut"></canvas>
+          <div style="text-align:center;">
+            <strong>Balance gauge</strong>
+            <div class="gauge"><div id="gaugeFill" class="gauge-fill"></div></div>
+            <div class="note" id="gaugeLabel">100%</div>
+          </div>
+        </div>
       </div>
 
-      <p id="resultText" class="ok"></p>
-      <div class="row">
+      <div class="row" style="justify-content:center; margin-top:6px;">
+        <div id="resultText" class="ok"></div>
+      </div>
+
+      <div class="row" style="justify-content:center;">
         <label>Balance:</label>
         <input type="text" id="balanceBox" readonly style="width:160px;">
         <span id="costInfo" class="note"></span>
       </div>
 
-      <canvas id="balanceGraph" width="900" height="420"></canvas>
-      <div class="note">Graph shows balance after each spin. Zero line is shown if within range.</div>
+      <div class="row" style="justify-content:center;">
+        <div class="progress" id="runProgress" aria-hidden="true"><div class="progress-bar" id="progressBar"></div></div>
+      </div>
+
+      <div class="row" style="justify-content:center;">
+        <canvas id="balanceGraph" width="900" height="420"></canvas>
+      </div>
+      <div class="note">Graph shows balance after each spin. Zero line is shown if within range. Colored ticks every 10 spins: green (win ≥ cost), red (loss).</div>
     </div>
   </div>
 
   <audio id="spinSound" src="https://www.soundjay.com/button/sounds/button-16.mp3"></audio>
 
 <script>
-/* ---------- State ---------- */
-let values = [], probs = [], cdf = [];
-let balance = 0, cost = 25, spinCount = 0;
-let balanceHistory = [];
-let autoRunInterval = null;
-let insufficientFundsShown = false;
+/* ================== STATE ================== */
+let values=[], probs=[], cdf=[];
+let balance=0, cost=25, startingBalance=0, spinCount=0;
+let balanceHistory=[], resultFlags=[];
+let autoRunInterval=null, insufficientFundsShown=false;
+let wheelSegments=[], rotation=0, spinning=false;
+let highlightIdx=null, highlightUntil=0;
 
-/* Wheel state */
-let wheelSegments = [];   // [{start,end,label,color}]
-let rotation = 0;         // current wheel rotation (radians)
-let spinning = false;
+/* ================== ELEMENTS ================== */
+const tableBody=document.querySelector('#prizeTable tbody');
+const addRowBtn=document.getElementById('addRowBtn');
+const submitButton=document.getElementById('submitButton');
+const resetButton=document.getElementById('resetButton');
+const backButton=document.getElementById('backButton');
+const spinButton=document.getElementById('spinButton');
+const autoRunButton=document.getElementById('autoRunButton');
+const stopButton=document.getElementById('stopButton');
+const revealKeyBtn=document.getElementById('revealKeyBtn');
+const pwGate=document.getElementById('pwGate');
+const pwInput=document.getElementById('pwInput');
+const pwCheckBtn=document.getElementById('pwCheckBtn');
+const pwMsg=document.getElementById('pwMsg');
+const keyInfo=document.getElementById('keyInfo');
+const keyWarn=document.getElementById('keyWarn');
+const sumWarnAboveButtons=document.getElementById('sumWarnAboveButtons');
+const keyStatsBlock=document.getElementById('keyStatsBlock');
+const avgPrizeBox=document.getElementById('avgPrize');
+const avgRTPBox=document.getElementById('avgRTP');
+const theoryStats=document.getElementById('theoryStats');
+const resultText=document.getElementById('resultText');
+const balanceBox=document.getElementById('balanceBox');
+const costInfo=document.getElementById('costInfo');
+const costInput=document.getElementById('costInput');
+const balanceInput=document.getElementById('balanceInput');
+const runProgress=document.getElementById('runProgress');
+const progressBar=document.getElementById('progressBar');
+const gaugeFill=document.getElementById('gaugeFill');
+const gaugeLabel=document.getElementById('gaugeLabel');
 
-/* ---------- Elements ---------- */
-const tableBody = document.querySelector('#prizeTable tbody');
-const addRowBtn = document.getElementById('addRowBtn');
+const graphCanvas=document.getElementById('balanceGraph');
+const gctx=graphCanvas.getContext('2d');
 
-const revealKeyBtn = document.getElementById('revealKeyBtn');
-const pwGate = document.getElementById('pwGate');
-const pwInput = document.getElementById('pwInput');
-const pwCheckBtn = document.getElementById('pwCheckBtn');
-const pwMsg = document.getElementById('pwMsg');
-const keyInfo = document.getElementById('keyInfo');
-const keyWarn = document.getElementById('keyWarn');
-const sumWarnAboveButtons = document.getElementById('sumWarnAboveButtons');
-const keyStatsBlock = document.getElementById('keyStatsBlock');
+const spinSound=document.getElementById('spinSound');
+const wheelCanvas=document.getElementById('wheelCanvas');
+const wctx=wheelCanvas.getContext('2d');
+const effects=document.getElementById('effects');
+const W=wheelCanvas.width, H=wheelCanvas.height, CX=W/2, CY=H/2, R=Math.min(W,H)/2-24;
 
-const submitButton = document.getElementById('submitButton');
-const resetButton = document.getElementById('resetButton');
-const backButton = document.getElementById('backButton');
-const spinButton = document.getElementById('spinButton');
-const autoRunButton = document.getElementById('autoRunButton');
-const stopButton = document.getElementById('stopButton');
+const donutCanvas=document.getElementById('donutCanvas');
+const dctx=donutCanvas.getContext('2d');
+const TAU=Math.PI*2;
 
-const avgPrizeBox = document.getElementById('avgPrize');
-const avgRTPBox = document.getElementById('avgRTP');
-const theoryStats = document.getElementById('theoryStats');
+/* Color-blind-safe Okabe–Ito palette */
+const palette=["#E69F00","#56B4E9","#009E73","#F0E442","#0072B2","#D55E00","#CC79A7","#999999"];
 
-const resultText = document.getElementById('resultText');
-const balanceBox = document.getElementById('balanceBox');
-const costInfo = document.getElementById('costInfo');
+/* ================== HELPERS ================== */
+const fmtMoney=n=>Number(n).toFixed(2);
+const fmtPct=n=>(Number(n)*100).toFixed(2)+"%";
+const modTau=a=>((a%TAU)+TAU)%TAU;
+const easeOutCubic=t=>1-Math.pow(1-t,3);
+function varGet(name){ return getComputedStyle(document.body).getPropertyValue(name).trim(); }
 
-const costInput = document.getElementById('costInput');
-const balanceInput = document.getElementById('balanceInput');
-
-const canvas = document.getElementById('balanceGraph');
-const ctx = canvas.getContext('2d');
-const spinSound = document.getElementById('spinSound');
-
-/* Wheel canvas */
-const wheelCanvas = document.getElementById('wheelCanvas');
-const wctx = wheelCanvas.getContext('2d');
-const W = wheelCanvas.width, H = wheelCanvas.height;
-const CX = W/2, CY = H/2;
-const R = Math.min(W, H)/2 - 24; // wheel radius
-
-/* ---------- Helpers ---------- */
-function fmtMoney(n){ return Number(n).toFixed(2); }
-function fmtPct(n){ return (Number(n)*100).toFixed(2) + "%"; }
-const TAU = Math.PI*2;
-const modTau = a => ((a % TAU) + TAU) % TAU;
-function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
-
-function addRow(v = "", p = "") {
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
+/* ================== MENU TABLE ================== */
+function addRow(v="",p=""){
+  const tr=document.createElement('tr');
+  tr.innerHTML=`
     <td><input type="number" step="0.01" class="prize" value="${v}" aria-label="Prize"></td>
     <td><input type="number" step="0.01" min="0" max="100" class="pct" value="${p}" aria-label="Percentage chance"></td>
-    <td><button class="delRowBtn" style="width:110px;">Delete</button></td>
-  `;
-  tr.querySelector('.delRowBtn').addEventListener('click', () => {
-    tr.remove(); autoRefreshKeyInfo();
-  });
-  tr.querySelector('.prize').addEventListener('input', autoRefreshKeyInfo);
-  tr.querySelector('.pct').addEventListener('input', autoRefreshKeyInfo);
+    <td><button class="delRowBtn" style="width:110px;">Delete</button></td>`;
+  tr.querySelector('.delRowBtn').addEventListener('click',()=>{ tr.remove(); autoRefreshKeyInfo(); renderDonut(); });
+  tr.querySelector('.prize').addEventListener('input',()=>{ autoRefreshKeyInfo(); renderDonut(); });
+  tr.querySelector('.pct').addEventListener('input',()=>{ autoRefreshKeyInfo(); renderDonut(); });
   tableBody.appendChild(tr);
 }
-
 function getRows(){
-  const rows = [...tableBody.querySelectorAll('tr')];
-  return {
-    prizes: rows.map(r => Number(r.querySelector('.prize').value)),
-    pcts:   rows.map(r => Number(r.querySelector('.pct').value))
-  };
+  const rows=[...tableBody.querySelectorAll('tr')];
+  return{ prizes:rows.map(r=>Number(r.querySelector('.prize').value)),
+          pcts:rows.map(r=>Number(r.querySelector('.pct').value)) };
 }
-
 function percentagesSumTo100(){
-  const { pcts } = getRows();
-  if (pcts.length === 0) return false;
-  if (pcts.some(p => Number.isNaN(p) || p < 0)) return false;
-  const total = pcts.reduce((a,b)=>a+b,0);
-  return Math.abs(total - 100) <= 0.001;
+  const {pcts}=getRows(); if(pcts.length===0) return false;
+  if(pcts.some(p=>Number.isNaN(p)||p<0)) return false;
+  const total=pcts.reduce((a,b)=>a+b,0);
+  return Math.abs(total-100)<=0.001;
 }
-
 function buildDistributionFromTable(){
-  const {prizes, pcts} = getRows();
-  values = prizes;
-  probs  = pcts.map(x => x/100);
-  cdf = [];
-  let c = 0; for (const p of probs) { c += p; cdf.push(c); }
-  if (cdf.length) cdf[cdf.length-1] = 1;
+  const {prizes,pcts}=getRows();
+  values=prizes; probs=pcts.map(x=>x/100);
+  cdf=[]; let c=0; for(const p of probs){ c+=p; cdf.push(c); } if(cdf.length) cdf[cdf.length-1]=1;
 }
+function expectedPrizeWeighted(){ return values.reduce((s,v,i)=>s+v*probs[i],0); }
 
-function expectedPrizeWeighted(){ return values.reduce((s,v,i)=> s + v*probs[i], 0); }
-
-/* ---------- Key info rendering ---------- */
+/* ================== KEY INFO ================== */
 function renderKeyStats(){
-  const costPer = Number(costInput.value);
-  if (Number.isNaN(costPer) || costPer <= 0) return;
-
-  const avg = expectedPrizeWeighted();
-  const rtp = avg / costPer;
-  const ev = avg - costPer;
-  const houseEdge = 1 - rtp;
-
-  const mean = avg;
-  const variance = values.reduce((s,v,i)=> s + probs[i]*(v-mean)*(v-mean), 0);
-  const stdev = Math.sqrt(variance);
-  const sorted = [...values].sort((a,b)=>a-b);
-  const median = (sorted.length % 2 ? sorted[(sorted.length-1)/2] : (sorted[sorted.length/2-1]+sorted[sorted.length/2])/2);
-
-  avgPrizeBox.value = fmtMoney(avg);
-  avgRTPBox.value   = fmtPct(rtp);
-  theoryStats.innerHTML =
-    `<div><strong>Expected change/spin:</strong> ${fmtMoney(ev)} &nbsp; `
-    + `<strong>House edge:</strong> ${fmtPct(houseEdge)}</div>`
-    + `<div>Min: ${fmtMoney(Math.min(...values))} &nbsp; `
-    + `Median: ${fmtMoney(median)} &nbsp; `
-    + `Max: ${fmtMoney(Math.max(...values))} &nbsp; `
-    + `Std dev: ${fmtMoney(stdev)}</div>`;
+  const costPer=Number(costInput.value); if(Number.isNaN(costPer)||costPer<=0) return;
+  const avg=expectedPrizeWeighted(), rtp=avg/costPer, ev=avg-costPer, houseEdge=1-rtp;
+  const mean=avg, variance=values.reduce((s,v,i)=>s+probs[i]*(v-mean)*(v-mean),0), stdev=Math.sqrt(variance);
+  const sorted=[...values].sort((a,b)=>a-b), median= sorted.length%2 ? sorted[(sorted.length-1)/2] : (sorted[sorted.length/2-1]+sorted[sorted.length/2])/2;
+  avgPrizeBox.value=fmtMoney(avg); avgRTPBox.value=fmtPct(rtp);
+  theoryStats.innerHTML=
+    `<div><strong>Expected change/spin:</strong> ${fmtMoney(ev)} &nbsp; <strong>House edge:</strong> ${fmtPct(houseEdge)}</div>`+
+    `<div>Min: ${fmtMoney(Math.min(...values))} &nbsp; Median: ${fmtMoney(median)} &nbsp; Max: ${fmtMoney(Math.max(...values))} &nbsp; Std dev: ${fmtMoney(stdev)}</div>`;
 }
-
-function clearKeyStats(){
-  avgPrizeBox.value = "";
-  avgRTPBox.value = "";
-  theoryStats.textContent = "";
-}
-
+function clearKeyStats(){ avgPrizeBox.value=""; avgRTPBox.value=""; theoryStats.textContent=""; }
 function showKeyInfo(){
-  const ok = percentagesSumTo100();
-  sumWarnAboveButtons.classList.toggle('hidden', ok);
-  keyWarn.classList.toggle('hidden', ok);
-
-  if (!ok) {
-    clearKeyStats();
-    keyStatsBlock.classList.add('hidden');
-    return;
-  }
-
-  keyStatsBlock.classList.remove('hidden');
-  buildDistributionFromTable();
-  renderKeyStats();
-  keyInfo.classList.remove('hidden');
+  const ok=percentagesSumTo100(); sumWarnAboveButtons.classList.toggle('hidden',ok); keyWarn.classList.toggle('hidden',ok);
+  if(!ok){ clearKeyStats(); keyStatsBlock.classList.add('hidden'); return; }
+  keyStatsBlock.classList.remove('hidden'); buildDistributionFromTable(); renderKeyStats(); keyInfo.classList.remove('hidden');
 }
-
-/* auto-refresh handler for any input change */
 function autoRefreshKeyInfo(){
-  if (!pwGate.classList.contains('hidden') || !keyInfo.classList.contains('hidden')) {
-    showKeyInfo();
-  } else {
-    const ok = percentagesSumTo100();
-    sumWarnAboveButtons.classList.toggle('hidden', ok);
-  }
+  if(!pwGate.classList.contains('hidden') || !keyInfo.classList.contains('hidden')) showKeyInfo();
+  else sumWarnAboveButtons.classList.toggle('hidden', percentagesSumTo100());
 }
 
-/* ---------- Wheel drawing & animation ---------- */
-const palette = [
-  "#f44336","#e91e63","#9c27b0","#673ab7","#3f51b5","#2196f3",
-  "#03a9f4","#00bcd4","#009688","#4caf50","#8bc34a","#cddc39",
-  "#ffeb3b","#ffc107","#ff9800","#ff5722"
-];
-
+/* ================== WHEEL + DONUT ================== */
 function buildWheelSegments(){
-  wheelSegments = [];
-  let a = 0;
-  for (let i=0;i<probs.length;i++){
-    const span = probs[i]*TAU;
-    const start = a;
-    const end = a + span;
-    a = end;
-    wheelSegments.push({
-      start, end,
-      label: fmtMoney(values[i]),
-      color: palette[i % palette.length]
-    });
+  wheelSegments=[]; let a=0;
+  for(let i=0;i<probs.length;i++){
+    const span=probs[i]*TAU, start=a, end=a+span; a=end;
+    wheelSegments.push({ start,end,label:fmtMoney(values[i]), color:palette[i%palette.length] });
   }
-  rotation = modTau(rotation); // keep clean
+  rotation=modTau(rotation);
 }
-
+function drawPointerShiny(){
+  const tipX=CX, tipY=CY-R-8, baseLx=CX-16, baseLy=CY-R-42, baseRx=CX+16, baseRy=CY-R-42;
+  const grd=wctx.createLinearGradient(baseLx,baseLy,baseRx,baseRy);
+  grd.addColorStop(0,"#fafafa"); grd.addColorStop(0.5,"#e0e0e0"); grd.addColorStop(1,"#fafafa");
+  wctx.save();
+  wctx.shadowColor="rgba(0,0,0,.35)"; wctx.shadowBlur=6; wctx.shadowOffsetY=2;
+  wctx.beginPath(); wctx.moveTo(tipX,tipY); wctx.lineTo(baseLx,baseLy); wctx.lineTo(baseRx,baseRy); wctx.closePath();
+  wctx.fillStyle=grd; wctx.fill(); wctx.strokeStyle=varGet("--wheel-rim"); wctx.lineWidth=2; wctx.stroke();
+  wctx.restore();
+}
 function drawWheel(){
-  // clear
   wctx.clearRect(0,0,W,H);
-
-  // segments
-  wheelSegments.forEach(seg=>{
-    wctx.beginPath();
-    wctx.moveTo(CX,CY);
-    wctx.fillStyle = seg.color;
-    wctx.arc(CX,CY,R, seg.start + rotation, seg.end + rotation);
-    wctx.closePath();
-    wctx.fill();
-    wctx.strokeStyle = "#000";
-    wctx.lineWidth = 2;
-    wctx.stroke();
+  wctx.save(); if(spinning) wctx.filter="blur(1.2px)";
+  wheelSegments.forEach((seg)=>{
+    wctx.beginPath(); wctx.moveTo(CX,CY);
+    wctx.fillStyle=seg.color;
+    wctx.arc(CX,CY,R, seg.start+rotation, seg.end+rotation);
+    wctx.closePath(); wctx.fill();
+    wctx.strokeStyle=varGet("--wheel-rim"); wctx.lineWidth=2; wctx.stroke();
   });
+  wctx.restore();
 
-  // labels (skip very tiny slices)
-  wctx.fillStyle = "#000";
-  wctx.font = "16px Arial";
-  wctx.textAlign = "center";
-  wctx.textBaseline = "middle";
-  wheelSegments.forEach(seg=>{
-    const span = seg.end - seg.start;
-    if (span < 0.06) return; // ~3.4°
-    const mid = (seg.start + seg.end)/2 + rotation;
-    const rx = CX + Math.cos(mid) * (R * 0.62);
-    const ry = CY + Math.sin(mid) * (R * 0.62);
+  // labels (skip tiny)
+  wctx.fillStyle="#000"; wctx.font="16px Arial"; wctx.textAlign="center"; wctx.textBaseline="middle";
+  wheelSegments.forEach((seg)=>{
+    const span=seg.end-seg.start; if(span<0.06) return;
+    const mid=(seg.start+seg.end)/2 + rotation;
+    const rx=CX + Math.cos(mid)*(R*0.62), ry=CY + Math.sin(mid)*(R*0.62);
     wctx.fillText(seg.label, rx, ry);
   });
 
   // center cap
-  wctx.beginPath();
-  wctx.arc(CX,CY, 20, 0, TAU);
-  wctx.fillStyle = "#fff";
-  wctx.fill();
-  wctx.strokeStyle="#000";
-  wctx.lineWidth=2;
-  wctx.stroke();
+  wctx.beginPath(); wctx.arc(CX,CY, 20, 0, TAU); wctx.fillStyle="#fff"; wctx.fill();
+  wctx.strokeStyle=varGet("--wheel-rim"); wctx.lineWidth=2; wctx.stroke();
 
-  // pointer (top)
-  drawPointer();
-}
+  drawPointerShiny();
 
-function drawPointer(){
-  const tipX = CX, tipY = CY - R - 8;
-  const baseLx = CX - 16, baseLy = CY - R - 42;
-  const baseRx = CX + 16, baseRy = CY - R - 42;
-  wctx.beginPath();
-  wctx.moveTo(tipX, tipY);
-  wctx.lineTo(baseLx, baseLy);
-  wctx.lineTo(baseRx, baseRy);
-  wctx.closePath();
-  wctx.fillStyle = "#000";
-  wctx.fill();
-  wctx.strokeStyle = "#000";
-  wctx.lineWidth = 2;
-  wctx.stroke();
-}
-
-function segmentMidAngle(idx){
-  const seg = wheelSegments[idx];
-  return (seg.start + seg.end)/2;
-}
-
-function animateSpinToIndex(idx, onDone){
-  if (!wheelSegments.length) { if (onDone) onDone(); return; }
-  spinning = true;
-  spinButton.disabled = true;
-  autoRunButton.disabled = true;
-  backButton.disabled = true;
-
-  const pointerAngle = -Math.PI/2; // top
-  const midBase = segmentMidAngle(idx); // base geometry
-  const deltaToAlign = modTau(pointerAngle - (midBase + rotation)); // rotation needed
-  const extraTurns = 4; // full spins
-  const finalRotation = rotation + extraTurns*TAU + deltaToAlign;
-
-  const duration = 3000; // ms
-  const start = performance.now();
-  const startRot = rotation;
-  function step(ts){
-    const t = Math.min(1, (ts - start) / duration);
-    const eased = easeOutCubic(t);
-    rotation = startRot + (finalRotation - startRot) * eased;
-    drawWheel();
-    if (t < 1) requestAnimationFrame(step);
-    else {
-      rotation = modTau(finalRotation);
-      drawWheel();
-      spinning = false;
-      spinButton.disabled = false;
-      autoRunButton.disabled = false;
-      backButton.disabled = false;
-      if (onDone) onDone();
-    }
+  // win highlight glow (if active)
+  if(highlightIdx!==null && Date.now()<highlightUntil){
+    const seg=wheelSegments[highlightIdx];
+    wctx.save();
+    wctx.strokeStyle="rgba(255,215,0,.95)";
+    wctx.lineWidth=10; wctx.shadowColor="rgba(255,215,0,.9)"; wctx.shadowBlur=22;
+    wctx.beginPath(); wctx.arc(CX,CY,R-4, seg.start+rotation, seg.end+rotation); wctx.stroke();
+    wctx.restore();
   }
+}
+const TAU_CONST = Math.PI*2;
+function segmentMidAngle(idx){ const seg=wheelSegments[idx]; return (seg.start+seg.end)/2; }
+function animateSpinToIndex(idx,onDone){
+  if(!wheelSegments.length){ onDone&&onDone(); return; }
+  spinning=true; spinButton.disabled=true; autoRunButton.disabled=true; backButton.disabled=true;
+  const pointerAngle=-Math.PI/2, midBase=segmentMidAngle(idx);
+  const delta=modTau(pointerAngle - (midBase + rotation));
+  const finalRotation=rotation + 4*TAU + delta;
+  const duration=3000, start=performance.now(), startRot=rotation;
+  const step=(ts)=>{
+    const t=Math.min(1,(ts-start)/duration), eased=easeOutCubic(t);
+    rotation=startRot + (finalRotation-startRot)*eased; drawWheel();
+    if(t<1) requestAnimationFrame(step); else{
+      rotation=modTau(finalRotation); drawWheel(); spinning=false;
+      spinButton.disabled=false; autoRunButton.disabled=false; backButton.disabled=false;
+      onDone&&onDone();
+    }
+  };
   requestAnimationFrame(step);
 }
+function renderDonut(){
+  const {pcts}=getRows(); const probsLocal=pcts.map(v=>v/100);
+  dctx.clearRect(0,0,donutCanvas.width,donutCanvas.height);
+  const cx=donutCanvas.width/2, cy=donutCanvas.height/2, r=70, inner=35; let a=0;
+  for(let i=0;i<probsLocal.length;i++){
+    const span=probsLocal[i]*TAU; dctx.beginPath(); dctx.moveTo(cx,cy);
+    dctx.fillStyle=palette[i%palette.length];
+    dctx.arc(cx,cy,r,a,a+span); dctx.lineTo(cx,cy); dctx.fill(); a+=span;
+  }
+  // donut hole
+  dctx.globalCompositeOperation="destination-out"; dctx.beginPath(); dctx.arc(cx,cy,inner,0,TAU); dctx.fill();
+  dctx.globalCompositeOperation="source-over"; dctx.strokeStyle="#000"; dctx.lineWidth=2; dctx.beginPath(); dctx.arc(cx,cy,r,0,TAU); dctx.stroke();
+  dctx.beginPath(); dctx.arc(cx,cy,inner,0,TAU); dctx.stroke();
+}
 
-/* ---------- Graph (always full redraw) ---------- */
-const graph = { left: 70, right: 24, top: 46, bottom: 46, yMin: null, yMax: null };
-
+/* ================== GRAPH (full redraw) ================== */
+const graph={ left:70,right:24,top:46,bottom:46,yMin:null,yMax:null };
 function computeYRange(){
-  const minBal = Math.min(...balanceHistory);
-  const maxBal = Math.max(...balanceHistory);
-  let yMin = Math.min(minBal, 0);
-  let yMax = Math.max(maxBal, 1);
-  if (yMax - yMin < 1) yMax = yMin + 1;
-  return { yMin, yMax };
+  const minBal=Math.min(...balanceHistory), maxBal=Math.max(...balanceHistory);
+  let yMin=Math.min(minBal,0), yMax=Math.max(maxBal,1); if(yMax-yMin<1) yMax=yMin+1; return {yMin,yMax};
 }
-function yToPx(v){
-  const H = canvas.height, top = graph.top, bottom = graph.bottom;
-  const plotH = H - top - bottom;
-  return top + ((graph.yMax - v)/(graph.yMax - graph.yMin))*plotH;
-}
-function xToPx(i){
-  const W = canvas.width, left = graph.left, right = graph.right;
-  const plotW = W - left - right;
-  const n = Math.max(1, balanceHistory.length - 1);
-  return left + plotW*(i/n);
-}
-
+function yToPx(v){ const H=graphCanvas.height, top=graph.top, bottom=graph.bottom, plotH=H-top-bottom; return top + ((graph.yMax - v)/(graph.yMax-graph.yMin))*plotH; }
+function xToPx(i){ const W=graphCanvas.width, left=graph.left, right=graph.right, plotW=W-left-right, n=Math.max(1,balanceHistory.length-1); return left + plotW*(i/n); }
 function drawAxesAndGrid(){
-  const W = canvas.width, H = canvas.height;
-  const { left, right, top, bottom } = graph;
-  const plotW = W - left - right, plotH = H - top - bottom;
-
-  ctx.clearRect(0,0,W,H);
-  ctx.font = "22px Arial"; ctx.textAlign="center"; ctx.fillStyle="#000";
-  ctx.fillText("Balance over time", W/2, 32);
-
-  ctx.strokeStyle = "#000"; ctx.lineWidth = 3; ctx.strokeRect(left, top, plotW, plotH);
-
-  ctx.font = "14px Arial"; ctx.textAlign="right"; ctx.fillStyle="#000";
-  for (let i=0;i<=5;i++){
-    const t=i/5, yVal = graph.yMax - t*(graph.yMax-graph.yMin), y = top + t*plotH;
-    ctx.fillText(yVal.toFixed(0), left-8, y+4);
-    ctx.strokeStyle = "#ddd"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(left,y); ctx.lineTo(left+plotW,y); ctx.stroke();
-  }
-
-  if (graph.yMin < 0 && graph.yMax > 0){
-    const t0 = (graph.yMax-0)/(graph.yMax-graph.yMin), y0 = top + t0*plotH;
-    ctx.strokeStyle="#999"; ctx.setLineDash([6,5]); ctx.lineWidth=2;
-    ctx.beginPath(); ctx.moveTo(left,y0); ctx.lineTo(left+plotW,y0); ctx.stroke(); ctx.setLineDash([]);
-  }
-
-  ctx.textAlign="center";
-  const n = balanceHistory.length - 1;
-  for (let i=0;i<=10;i++){
-    const idx = Math.round(n*i/10), x = left + plotW*(idx/Math.max(1,n));
-    ctx.fillText(idx, x, top+plotH+22);
-    ctx.strokeStyle="#eee"; ctx.beginPath(); ctx.moveTo(x,top); ctx.lineTo(x,top+plotH); ctx.stroke();
-  }
+  const W=graphCanvas.width, H=graphCanvas.height; const {left,right,top,bottom}=graph; const plotW=W-left-right, plotH=H-top-bottom;
+  gctx.clearRect(0,0,W,H);
+  gctx.font="22px Arial"; gctx.textAlign="center"; gctx.fillStyle=varGet("--fg"); gctx.fillText("Balance over time", W/2, 32);
+  gctx.strokeStyle=varGet("--border"); gctx.lineWidth=3; gctx.strokeRect(left,top,plotW,plotH);
+  gctx.font="14px Arial"; gctx.textAlign="right"; gctx.fillStyle=varGet("--fg");
+  for(let i=0;i<=5;i++){ const t=i/5, yVal=graph.yMax - t*(graph.yMax-graph.yMin), y=top+t*plotH;
+    gctx.fillText(yVal.toFixed(0), left-8, y+4); gctx.strokeStyle="#ddd"; gctx.lineWidth=1.5; gctx.beginPath(); gctx.moveTo(left,y); gctx.lineTo(left+plotW,y); gctx.stroke(); }
+  if(graph.yMin<0 && graph.yMax>0){ const t0=(graph.yMax-0)/(graph.yMax-graph.yMin), y0=top+t0*plotH; gctx.strokeStyle="#999"; gctx.setLineDash([6,5]); gctx.lineWidth=2; gctx.beginPath(); gctx.moveTo(left,y0); gctx.lineTo(left+plotW,y0); gctx.stroke(); gctx.setLineDash([]); }
+  gctx.textAlign="center"; const n=balanceHistory.length-1;
+  for(let i=0;i<=10;i++){ const idx=Math.round(n*i/10), x=left+plotW*(idx/Math.max(1,n)); gctx.fillText(idx, x, top+plotH+22); gctx.strokeStyle="#eee"; gctx.beginPath(); gctx.moveTo(x,top); gctx.lineTo(x,top+plotH); gctx.stroke(); }
 }
-
 function fullRedraw(){
-  const { yMin, yMax } = computeYRange();
-  graph.yMin = yMin; graph.yMax = yMax;
-
-  drawAxesAndGrid();
-
-  if (balanceHistory.length === 0) return;
-
-  // draw full line
-  ctx.strokeStyle = "#1e88e5"; ctx.lineWidth = 3; ctx.beginPath();
-  for (let i=0;i<balanceHistory.length;i++){
-    const x = xToPx(i), y = yToPx(balanceHistory[i]);
-    if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-  }
-  ctx.stroke();
-
-  // draw points
-  ctx.fillStyle="#e53935";
-  for (let i=0;i<balanceHistory.length;i++){
-    const x = xToPx(i), y = yToPx(balanceHistory[i]);
-    ctx.beginPath(); ctx.arc(x,y,3,0,TAU); ctx.fill();
+  if(balanceHistory.length===0){ gctx.clearRect(0,0,graphCanvas.width,graphCanvas.height); return; }
+  const {yMin,yMax}=computeYRange(); graph.yMin=yMin; graph.yMax=yMax; drawAxesAndGrid();
+  // line
+  gctx.strokeStyle="#1e88e5"; gctx.lineWidth=3; gctx.beginPath();
+  for(let i=0;i<balanceHistory.length;i++){ const x=xToPx(i), y=yToPx(balanceHistory[i]); if(i===0) gctx.moveTo(x,y); else gctx.lineTo(x,y); } gctx.stroke();
+  // points
+  gctx.fillStyle="#e53935";
+  for(let i=0;i<balanceHistory.length;i++){ const x=xToPx(i), y=yToPx(balanceHistory[i]); gctx.beginPath(); gctx.arc(x,y,3,0,TAU); gctx.fill(); }
+  // win/loss markers every 10 spins
+  const H=graphCanvas.height, bottom=graph.bottom, baseY=H-bottom+4;
+  for(let i=10;i<=balanceHistory.length-1;i+=10){
+    const winFlag=resultFlags[i-1]; gctx.strokeStyle= winFlag ? "#2ca02c" : "#d62728"; gctx.lineWidth=3;
+    const x=xToPx(i); gctx.beginPath(); gctx.moveTo(x, baseY-12); gctx.lineTo(x, baseY-2); gctx.stroke();
   }
 }
 
-/* ---------- Sampling & run control ---------- */
+/* ================== RUN / SPIN ================== */
 function weightedPick(){
-  const r = Math.random();
-  let lo=0, hi=cdf.length-1, ans=hi;
-  while (lo<=hi){ const mid=(lo+hi)>>1; if (r<=cdf[mid]){ ans=mid; hi=mid-1; } else lo=mid+1; }
-  return ans;
+  const r=Math.random(); let lo=0, hi=cdf.length-1, ans=hi;
+  while(lo<=hi){ const mid=(lo+hi)>>1; if(r<=cdf[mid]){ ans=mid; hi=mid-1; } else lo=mid+1; } return ans;
 }
-
-function settleSpin(idx, win, manual){
-  balance -= Number(costInput.value);
-  balance += win;
-  spinCount++;
-  balanceHistory.push(balance);
-  resultText.textContent = `Spin #${spinCount}: won ${fmtMoney(win)} (p≈${fmtPct(probs[idx])})`;
+function updateGauge(){
+  const pct = Math.max(0, Math.min(100, (balance/startingBalance)*100));
+  gaugeFill.style.width = pct + "%";
+  gaugeLabel.textContent = pct.toFixed(0) + "%";
+}
+function celebrateBigWin(amount){
+  const threshold = 10*Number(costInput.value);
+  if(amount < threshold) return;
+  // coins
+  for(let i=0;i<16;i++){
+    const span=document.createElement('div'); span.className='coin'; span.textContent='🪙';
+    const tx=(Math.random()*240-120)+'px', ty=(Math.random()*-180-60)+'px';
+    span.style.setProperty('--tx', tx); span.style.setProperty('--ty', ty);
+    effects.appendChild(span); setTimeout(()=>span.remove(), 1000);
+  }
+  // popup
+  const pop=document.createElement('div'); pop.className='popup'; pop.textContent=`+${fmtMoney(amount)}`;
+  pop.style.color="gold"; pop.style.textShadow="0 2px 0 rgba(0,0,0,.35)";
+  effects.appendChild(pop); setTimeout(()=>pop.remove(), 1100);
+}
+function setProgress(show, frac=0){
+  runProgress.style.visibility = show ? 'visible' : 'hidden';
+  progressBar.style.width = (Math.max(0, Math.min(1, frac))*100).toFixed(1) + "%";
+}
+function settleSpin(idx,win,manual){
+  balance -= Number(costInput.value); balance += win;
+  spinCount++; balanceHistory.push(balance); resultFlags.push(win >= Number(costInput.value));
+  const cls = win >= Number(costInput.value) ? 'result-win' : (win>0 ? 'result-small' : 'result-loss');
+  resultText.className = cls; resultText.textContent = `Spin #${spinCount}: won ${fmtMoney(win)} (p≈${fmtPct(probs[idx])})`;
   balanceBox.value = fmtMoney(balance);
-
-  // Always redraw full series so X-scale stays consistent (no end “fan”)
-  fullRedraw();
+  // highlight + big win FX
+  highlightIdx = idx; highlightUntil = Date.now() + 1200; drawWheel(); celebrateBigWin(win);
+  updateGauge(); fullRedraw();
 }
-
 function spin(manual=true){
-  if (spinning) return false;
-  const c = Number(costInput.value);
-  if (balance < c){
-    if(!insufficientFundsShown && manual) alert("Insufficient funds");
-    insufficientFundsShown = true;
-    return false;
-  }
-  if (manual){ try{ spinSound.currentTime=0; spinSound.play(); }catch(e){} }
-
-  const idx = weightedPick();
-  const win = values[idx];
-
-  if (manual){
-    animateSpinToIndex(idx, ()=> settleSpin(idx, win, true));
-  } else {
-    settleSpin(idx, win, false);
-  }
+  if(spinning) return false;
+  const c=Number(costInput.value);
+  if(balance < c){ if(!insufficientFundsShown && manual) alert("Insufficient funds"); insufficientFundsShown=true; return false; }
+  if(manual){ try{ spinSound.currentTime=0; spinSound.play(); }catch(e){} }
+  const idx=weightedPick(), win=values[idx];
+  if(manual) animateSpinToIndex(idx, ()=>settleSpin(idx,win,true)); else settleSpin(idx,win,false);
   return true;
 }
-
 function autoRunTrials(total=500, speed=20){
-  let ct=0; clearInterval(autoRunInterval); stopButton.disabled = false; autoRunButton.disabled = true; spinButton.disabled = true;
-  autoRunInterval = setInterval(()=>{
-    if (ct>=total || balance < Number(costInput.value)){
-      clearInterval(autoRunInterval); stopButton.disabled = true; autoRunButton.disabled = false; spinButton.disabled = false;
-      if (balance < Number(costInput.value) && !insufficientFundsShown) alert("Insufficient funds");
-      insufficientFundsShown = balance < Number(costInput.value);
+  let ct=0; clearInterval(autoRunInterval); stopButton.disabled=false; autoRunButton.disabled=true; spinButton.disabled=true; setProgress(true,0);
+  autoRunInterval=setInterval(()=>{
+    if(ct>=total || balance < Number(costInput.value)){
+      clearInterval(autoRunInterval); stopButton.disabled=true; autoRunButton.disabled=false; spinButton.disabled=false; setProgress(false,0);
+      if(balance < Number(costInput.value) && !insufficientFundsShown) alert("Insufficient funds"); insufficientFundsShown = balance < Number(costInput.value);
       return;
     }
-    spin(false); ct++;
+    spin(false); ct++; setProgress(true, ct/total);
   }, speed);
 }
-function stopAutoRun(){ clearInterval(autoRunInterval); stopButton.disabled = true; autoRunButton.disabled = false; spinButton.disabled = false; }
+function stopAutoRun(){ clearInterval(autoRunInterval); stopButton.disabled=true; autoRunButton.disabled=false; spinButton.disabled=false; setProgress(false,0); }
 
-/* ---------- Navigation / setup ---------- */
+/* ================== NAV / SETUP ================== */
 function toSpinnerScreen(){
   document.getElementById('menuScreen').classList.add('hidden');
   document.getElementById('spinnerScreen').classList.remove('hidden');
-  buildWheelSegments();
-  drawWheel();
-  fullRedraw(); // fresh graph
+  buildDistributionFromTable(); buildWheelSegments(); drawWheel(); renderDonut(); updateGauge(); fullRedraw();
 }
 function toMenuScreen(){
   document.getElementById('spinnerScreen').classList.add('hidden');
   document.getElementById('menuScreen').classList.remove('hidden');
-
-  // Re-lock key info when returning to menu
-  keyInfo.classList.add('hidden');
-  pwGate.classList.add('hidden');
-  pwInput.value = "";
-  pwMsg.textContent = "";
+  keyInfo.classList.add('hidden'); pwGate.classList.add('hidden'); pwInput.value=""; pwMsg.textContent="";
 }
-
 function submit(){
-  if (!percentagesSumTo100()){
-    sumWarnAboveButtons.classList.remove('hidden');
-    keyWarn.classList.remove('hidden');
-    keyStatsBlock.classList.add('hidden');
-    return;
-  }
-
-  buildDistributionFromTable();
-
-  balance = Number(balanceInput.value);
-  cost    = Number(costInput.value);
-  if (Number.isNaN(balance) || Number.isNaN(cost) || balance<=0 || cost<=0){
-    alert("Please enter valid positive numbers for balance and cost per spin.");
-    return;
-  }
-
+  if(!percentagesSumTo100()){ sumWarnAboveButtons.classList.remove('hidden'); keyWarn.classList.remove('hidden'); keyStatsBlock.classList.add('hidden'); return; }
+  buildDistributionFromTable(); startingBalance = Number(balanceInput.value); balance = startingBalance; cost = Number(costInput.value);
+  if(Number.isNaN(balance)||Number.isNaN(cost)||balance<=0||cost<=0){ alert("Please enter valid positive numbers for balance and cost per spin."); return; }
   showKeyInfo();
-
-  balanceHistory = [balance]; spinCount = 0; insufficientFundsShown = false;
-
-  toSpinnerScreen();
-  balanceBox.value = fmtMoney(balance);
-  costInfo.textContent = `Cost per spin: ${fmtMoney(cost)}`;
+  balanceHistory=[balance]; resultFlags=[]; spinCount=0; insufficientFundsShown=false;
+  setProgress(false,0);
+  toSpinnerScreen(); balanceBox.value=fmtMoney(balance); costInfo.textContent=`Cost per spin: ${fmtMoney(cost)}`;
 }
-
 function resetAll(){
-  tableBody.innerHTML = '';
-  addRow(0, 60); addRow(5, 30); addRow(45, 10); // defaults
-  costInput.value = 25;
-  balanceInput.value = 10000;
-
-  keyInfo.classList.add('hidden');
-  pwGate.classList.add('hidden');
-  pwInput.value = "";
-  pwMsg.textContent = "";
-  clearKeyStats();
-  sumWarnAboveButtons.classList.add('hidden');
-
-  rotation = 0; wheelSegments = [];
-  drawWheel();
-
-  // reset graph canvas
-  ctx.clearRect(0,0,canvas.width, canvas.height);
+  tableBody.innerHTML=''; addRow(0,60); addRow(5,30); addRow(45,10);
+  costInput.value=25; balanceInput.value=10000;
+  keyInfo.classList.add('hidden'); pwGate.classList.add('hidden'); pwInput.value=""; pwMsg.textContent="";
+  clearKeyStats(); sumWarnAboveButtons.classList.add('hidden');
+  rotation=0; wheelSegments=[]; drawWheel(); renderDonut();
+  gctx.clearRect(0,0,graphCanvas.width,graphCanvas.height); updateGauge(); setProgress(false,0);
 }
 
-/* ---------- Events ---------- */
-addRowBtn.addEventListener('click', ()=> { addRow(); autoRefreshKeyInfo(); });
-
-tableBody.addEventListener('input', autoRefreshKeyInfo);
+/* ================== EVENTS ================== */
+addRowBtn.addEventListener('click', ()=>{ addRow(); autoRefreshKeyInfo(); renderDonut(); });
+tableBody.addEventListener('input', ()=>{ autoRefreshKeyInfo(); renderDonut(); });
 costInput.addEventListener('input', autoRefreshKeyInfo);
 
-revealKeyBtn.addEventListener('click', ()=>{
-  showKeyInfo();
-  pwGate.classList.remove('hidden');
-  keyInfo.classList.add('hidden');
-  pwInput.focus();
-});
-pwCheckBtn.addEventListener('click', ()=>{
-  if (pwInput.value === "Piis3.14"){
-    keyInfo.classList.remove('hidden');
-    pwMsg.textContent = "Unlocked."; pwMsg.style.color = "#1b5e20";
-    autoRefreshKeyInfo();
-  } else {
-    pwMsg.textContent = "Incorrect password."; pwMsg.style.color = "#b00020";
-  }
-});
-pwInput.addEventListener('keydown', (e)=>{ if (e.key === "Enter") pwCheckBtn.click(); });
+revealKeyBtn.addEventListener('click', ()=>{ showKeyInfo(); pwGate.classList.remove('hidden'); keyInfo.classList.add('hidden'); pwInput.focus(); });
+pwCheckBtn.addEventListener('click', ()=>{ if(pwInput.value==="Piis3.14"){ keyInfo.classList.remove('hidden'); pwMsg.textContent="Unlocked."; pwMsg.style.color="var(--ok)"; autoRefreshKeyInfo(); } else { pwMsg.textContent="Incorrect password."; pwMsg.style.color="var(--warn)"; } });
+pwInput.addEventListener('keydown',(e)=>{ if(e.key==="Enter") pwCheckBtn.click(); });
 
 submitButton.addEventListener('click', submit);
 resetButton.addEventListener('click', resetAll);
@@ -662,10 +564,8 @@ spinButton.addEventListener('click', ()=>spin(true));
 autoRunButton.addEventListener('click', ()=>autoRunTrials());
 stopButton.addEventListener('click', stopAutoRun);
 
-/* Initial rows + initial blank wheel draw */
-resetAll();
-buildWheelSegments();
-drawWheel();
+/* ================== INIT ================== */
+resetAll(); buildWheelSegments(); drawWheel(); renderDonut();
 </script>
 </body>
 </html>
