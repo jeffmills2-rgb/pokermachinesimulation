@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Probability Spinner Simulator (Rounded Table)</title>
+<title>Probability Spinner Simulator (Auto-update + Inline % warning)</title>
 <style>
   :root {
-    --fg:#111; --muted:#555; --border:#000; --accent:#1b5e20;
-    --table-w: 640px; /* adjust if you want wider/narrower */
+    --fg:#111; --muted:#555; --border:#000; --accent:#1b5e20; --warn:#b00020;
+    --table-w: 640px; /* widen/narrow the table here */
   }
   body { font-family: Arial, sans-serif; color:var(--fg); margin:24px; line-height:1.35; }
   h1 { font-size: 34px; margin: 0 0 16px; }
@@ -21,6 +21,7 @@
   }
   button { padding:10px 16px; margin:10px 12px 0 0; border:3px solid #000; border-radius:12px; background:#fff; }
   .note { color:var(--muted); font-size:14px; }
+  .warn { color: var(--warn); font-size:16px; margin-top:8px; }
   .row { display:flex; gap:18px; align-items:center; flex-wrap:wrap; margin:12px 0; }
   .controls { margin-top:14px; }
 
@@ -79,6 +80,8 @@
     </table>
   </div>
 
+  <div id="sumWarnAboveButtons" class="warn hidden">% does not total 100</div>
+
   <button id="addRowBtn">Add row</button>
 
   <div class="controls">
@@ -98,11 +101,15 @@
   </div>
 
   <div id="keyInfo" class="hidden" aria-live="polite">
-    <div class="row" style="margin-top:14px;">
-      <span><strong>Average prize:</strong> <input type="text" id="avgPrize" readonly style="width:160px;"></span>
-      <span><strong>Average RTP:</strong> <input type="text" id="avgRTP" readonly style="width:160px;"></span>
+    <div id="keyWarn" class="warn hidden">% does not total 100</div>
+
+    <div id="keyStatsBlock">
+      <div class="row" style="margin-top:14px;">
+        <span><strong>Average prize:</strong> <input type="text" id="avgPrize" readonly style="width:160px;"></span>
+        <span><strong>Average RTP:</strong> <input type="text" id="avgRTP" readonly style="width:160px;"></span>
+      </div>
+      <div class="stats" id="theoryStats"></div>
     </div>
-    <div class="stats" id="theoryStats"></div>
   </div>
 </div>
 
@@ -146,6 +153,9 @@ const pwInput = document.getElementById('pwInput');
 const pwCheckBtn = document.getElementById('pwCheckBtn');
 const pwMsg = document.getElementById('pwMsg');
 const keyInfo = document.getElementById('keyInfo');
+const keyWarn = document.getElementById('keyWarn');
+const sumWarnAboveButtons = document.getElementById('sumWarnAboveButtons');
+const keyStatsBlock = document.getElementById('keyStatsBlock');
 
 const submitButton = document.getElementById('submitButton');
 const resetButton = document.getElementById('resetButton');
@@ -161,6 +171,9 @@ const theoryStats = document.getElementById('theoryStats');
 const resultText = document.getElementById('resultText');
 const balanceBox = document.getElementById('balanceBox');
 const costInfo = document.getElementById('costInfo');
+
+const costInput = document.getElementById('costInput');
+const balanceInput = document.getElementById('balanceInput');
 
 const canvas = document.getElementById('balanceGraph');
 const ctx = canvas.getContext('2d');
@@ -178,8 +191,11 @@ function addRow(v = "", p = "") {
     <td><button class="delRowBtn" style="width:110px;">Delete</button></td>
   `;
   tr.querySelector('.delRowBtn').addEventListener('click', () => {
-    tr.remove(); updateKeyInfoIfVisible();
+    tr.remove(); autoRefreshKeyInfo();
   });
+  // live updates on change
+  tr.querySelector('.prize').addEventListener('input', autoRefreshKeyInfo);
+  tr.querySelector('.pct').addEventListener('input', autoRefreshKeyInfo);
   tableBody.appendChild(tr);
 }
 
@@ -191,14 +207,12 @@ function getRows(){
   };
 }
 
-function validatePercentagesMustSum100(){
-  const {prizes, pcts} = getRows();
-  if (prizes.length === 0) { alert("Please add at least one row."); return false; }
-  if (prizes.some(v => Number.isNaN(v))) { alert("All prize values must be numbers."); return false; }
-  if (pcts.some(p => Number.isNaN(p) || p < 0)) { alert("All percentages must be numbers ≥ 0."); return false; }
+function percentagesSumTo100(){
+  const { pcts } = getRows();
+  if (pcts.length === 0) return false;
+  if (pcts.some(p => Number.isNaN(p) || p < 0)) return false;
   const total = pcts.reduce((a,b)=>a+b,0);
-  if (Math.abs(total - 100) > 0.001) { alert(`Percentages must add to 100. Current total: ${total.toFixed(2)}%`); return false; }
-  return true;
+  return Math.abs(total - 100) <= 0.001;
 }
 
 function buildDistributionFromTable(){
@@ -207,24 +221,22 @@ function buildDistributionFromTable(){
   probs  = pcts.map(x => x/100);
   cdf = [];
   let c = 0; for (const p of probs) { c += p; cdf.push(c); }
-  cdf[cdf.length-1] = 1; // safety
+  if (cdf.length) cdf[cdf.length-1] = 1; // safety
 }
 
 function expectedPrizeWeighted(){ return values.reduce((s,v,i)=> s + v*probs[i], 0); }
 
-function showKeyInfo(){
-  if (!validatePercentagesMustSum100()) return;
-  buildDistributionFromTable();
-
-  const costPer = Number(document.getElementById('costInput').value);
-  if (Number.isNaN(costPer) || costPer <= 0) { alert("Please enter a positive number for cost per spin."); return; }
+/* ---------- Key info rendering ---------- */
+function renderKeyStats(){
+  // compute + render stats (assumes distribution has been built)
+  const costPer = Number(costInput.value);
+  if (Number.isNaN(costPer) || costPer <= 0) return;
 
   const avg = expectedPrizeWeighted();
   const rtp = avg / costPer;
   const ev = avg - costPer;
   const houseEdge = 1 - rtp;
 
-  // dispersion (weighted)
   const mean = avg;
   const variance = values.reduce((s,v,i)=> s + probs[i]*(v-mean)*(v-mean), 0);
   const stdev = Math.sqrt(variance);
@@ -240,11 +252,44 @@ function showKeyInfo(){
     + `Median: ${fmtMoney(median)} &nbsp; `
     + `Max: ${fmtMoney(Math.max(...values))} &nbsp; `
     + `Std dev: ${fmtMoney(stdev)}</div>`;
+}
 
+function clearKeyStats(){
+  avgPrizeBox.value = "";
+  avgRTPBox.value = "";
+  theoryStats.textContent = "";
+}
+
+function showKeyInfo(){
+  // Decides what to show in the key info section (warning vs stats)
+  const ok = percentagesSumTo100();
+
+  // toggle inline warnings (above buttons and inside key info)
+  sumWarnAboveButtons.classList.toggle('hidden', ok);
+  keyWarn.classList.toggle('hidden', ok);
+
+  if (!ok) {
+    clearKeyStats();
+    keyStatsBlock.classList.add('hidden');
+    return;
+  }
+
+  keyStatsBlock.classList.remove('hidden');
+  buildDistributionFromTable();
+  renderKeyStats();
   keyInfo.classList.remove('hidden');
 }
 
-function updateKeyInfoIfVisible(){ if (!keyInfo.classList.contains('hidden')) showKeyInfo(); }
+/* auto-refresh handler for any input change */
+function autoRefreshKeyInfo(){
+  if (!pwGate.classList.contains('hidden') || !keyInfo.classList.contains('hidden')) {
+    showKeyInfo();
+  } else {
+    // still reflect sum warning above buttons even before reveal
+    const ok = percentagesSumTo100();
+    sumWarnAboveButtons.classList.toggle('hidden', ok);
+  }
+}
 
 /* ---------- Graph ---------- */
 function drawGraph(animatedIndex = balanceHistory.length - 1){
@@ -312,7 +357,7 @@ function setAutorun(run){
   autoRunButton.disabled = run; spinButton.disabled = run; stopButton.disabled = !run;
 }
 function spin(manual=true){
-  const c = Number(document.getElementById('costInput').value);
+  const c = Number(costInput.value);
   if (balance < c){ if(!insufficientFundsShown && manual) alert("Insufficient funds"); insufficientFundsShown=true; return false; }
   if (manual){ try{ spinSound.currentTime=0; spinSound.play(); }catch(e){} }
 
@@ -328,10 +373,10 @@ function spin(manual=true){
 function autoRunTrials(total=500, speed=20){
   let ct=0; clearInterval(autoRunInterval); setAutorun(true);
   autoRunInterval = setInterval(()=>{
-    if (ct>=total || balance < Number(document.getElementById('costInput').value)){
+    if (ct>=total || balance < Number(costInput.value)){
       clearInterval(autoRunInterval); setAutorun(false);
-      if (balance < Number(document.getElementById('costInput').value) && !insufficientFundsShown) alert("Insufficient funds");
-      insufficientFundsShown = balance < Number(document.getElementById('costInput').value);
+      if (balance < Number(costInput.value) && !insufficientFundsShown) alert("Insufficient funds");
+      insufficientFundsShown = balance < Number(costInput.value);
       return;
     }
     spin(false); ct++;
@@ -344,11 +389,18 @@ function toSpinnerScreen(){ document.getElementById('menuScreen').classList.add(
 function toMenuScreen(){ document.getElementById('spinnerScreen').classList.add('hidden'); document.getElementById('menuScreen').classList.remove('hidden'); }
 
 function submit(){
-  if (!validatePercentagesMustSum100()) return;
+  if (!percentagesSumTo100()){
+    // show inline warnings; do not alert
+    sumWarnAboveButtons.classList.remove('hidden');
+    keyWarn.classList.remove('hidden');
+    keyStatsBlock.classList.add('hidden');
+    return;
+  }
+
   buildDistributionFromTable();
 
-  balance = Number(document.getElementById('balanceInput').value);
-  cost    = Number(document.getElementById('costInput').value);
+  balance = Number(balanceInput.value);
+  cost    = Number(costInput.value);
   if (Number.isNaN(balance) || Number.isNaN(cost) || balance<=0 || cost<=0){
     alert("Please enter valid positive numbers for balance and cost per spin.");
     return;
@@ -366,22 +418,26 @@ function submit(){
 
 function resetAll(){
   tableBody.innerHTML = '';
-  addRow(0, 60); addRow(5, 30); addRow(45, 10); // simple defaults
-  document.getElementById('costInput').value = 25;
-  document.getElementById('balanceInput').value = 10000;
+  addRow(0, 60); addRow(5, 30); addRow(45, 10); // defaults
+  costInput.value = 25;
+  balanceInput.value = 10000;
 
   // hide/lock key info
   keyInfo.classList.add('hidden');
   pwGate.classList.add('hidden');
   pwInput.value = "";
   pwMsg.textContent = "";
-  avgPrizeBox.value = ''; avgRTPBox.value = ''; theoryStats.textContent='';
+  clearKeyStats();
+  sumWarnAboveButtons.classList.add('hidden');
 }
 
 /* ---------- Events ---------- */
-addRowBtn.addEventListener('click', ()=> addRow());
+addRowBtn.addEventListener('click', ()=> { addRow(); autoRefreshKeyInfo(); });
+
+tableBody.addEventListener('input', autoRefreshKeyInfo);
+costInput.addEventListener('input', autoRefreshKeyInfo);
+
 revealKeyBtn.addEventListener('click', ()=>{
-  // compute stats (kept hidden) so boxes fill once unlocked
   showKeyInfo();
   pwGate.classList.remove('hidden');
   keyInfo.classList.add('hidden');
@@ -391,6 +447,7 @@ pwCheckBtn.addEventListener('click', ()=>{
   if (pwInput.value === "Piis3.14"){
     keyInfo.classList.remove('hidden');
     pwMsg.textContent = "Unlocked."; pwMsg.style.color = "#1b5e20";
+    autoRefreshKeyInfo(); // immediately reflect current numbers
   } else {
     pwMsg.textContent = "Incorrect password."; pwMsg.style.color = "#b00020";
   }
