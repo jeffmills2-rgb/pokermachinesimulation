@@ -3,13 +3,21 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Probability Spinner Simulator (Auto-update + Inline % warning)</title>
+<title>Probability Spinner Simulator (Centered + Auto-update)</title>
 <style>
   :root {
     --fg:#111; --muted:#555; --border:#000; --accent:#1b5e20; --warn:#b00020;
-    --table-w: 640px; /* widen/narrow the table here */
+    --table-w: 640px; /* make wider/narrower if you like */
   }
-  body { font-family: Arial, sans-serif; color:var(--fg); margin:24px; line-height:1.35; }
+
+  /* Center the whole program */
+  .app {
+    width: min(100%, 980px);
+    margin: 0 auto;
+    padding: 0 12px;
+  }
+
+  body { font-family: Arial, sans-serif; color:var(--fg); margin:24px 0; line-height:1.35; }
   h1 { font-size: 34px; margin: 0 0 16px; }
   h3 { font-size: 22px; margin: 18px 0 8px; }
   .hidden { display:none; }
@@ -49,90 +57,91 @@
 </style>
 </head>
 <body>
+  <div class="app">
+    <h1>Welcome to the Probability Spinner Simulator</h1>
 
-<h1>Welcome to the Probability Spinner Simulator</h1>
-
-<div id="menuScreen">
-  <div class="row">
-    <label for="costInput">Cost per spin:</label>
-    <input type="number" id="costInput" min="0.01" step="0.01" value="25">
-    <label for="balanceInput">Starting balance:</label>
-    <input type="number" id="balanceInput" min="0.01" step="0.01" value="10000">
-  </div>
-
-  <h3>Enter your prize amounts and chance of winning in the box below</h3>
-
-  <div class="table-wrap">
-    <table id="prizeTable" aria-label="Prize and percentage table">
-      <thead>
-        <tr>
-          <th>Prize</th>
-          <th>Percentage chance</th>
-          <th style="width:140px;">Row</th>
-        </tr>
-      </thead>
-      <tbody><!-- rows inserted by JS --></tbody>
-      <tfoot>
-        <tr>
-          <td colspan="3" class="note">Percentages must total 100%.</td>
-        </tr>
-      </tfoot>
-    </table>
-  </div>
-
-  <div id="sumWarnAboveButtons" class="warn hidden">% does not total 100</div>
-
-  <button id="addRowBtn">Add row</button>
-
-  <div class="controls">
-    <button id="revealKeyBtn">Reveal key information</button>
-    <button id="submitButton">Submit</button>
-    <button id="resetButton">Reset</button>
-  </div>
-
-  <!-- Password + key info -->
-  <div id="pwGate" class="hidden">
-    <div class="pwbox">
-      <label for="pwInput"><strong>Password:</strong></label>
-      <input type="password" id="pwInput" placeholder="Enter password">
-      <button id="pwCheckBtn">Unlock</button>
-      <span id="pwMsg" class="note"></span>
-    </div>
-  </div>
-
-  <div id="keyInfo" class="hidden" aria-live="polite">
-    <div id="keyWarn" class="warn hidden">% does not total 100</div>
-
-    <div id="keyStatsBlock">
-      <div class="row" style="margin-top:14px;">
-        <span><strong>Average prize:</strong> <input type="text" id="avgPrize" readonly style="width:160px;"></span>
-        <span><strong>Average RTP:</strong> <input type="text" id="avgRTP" readonly style="width:160px;"></span>
+    <div id="menuScreen">
+      <div class="row">
+        <label for="costInput">Cost per spin:</label>
+        <input type="number" id="costInput" min="0.01" step="0.01" value="25">
+        <label for="balanceInput">Starting balance:</label>
+        <input type="number" id="balanceInput" min="0.01" step="0.01" value="10000">
       </div>
-      <div class="stats" id="theoryStats"></div>
+
+      <h3>Enter your prize amounts and chance of winning in the box below</h3>
+
+      <div class="table-wrap">
+        <table id="prizeTable" aria-label="Prize and percentage table">
+          <thead>
+            <tr>
+              <th>Prize</th>
+              <th>Percentage chance</th>
+              <th style="width:140px;">Row</th>
+            </tr>
+          </thead>
+          <tbody><!-- rows inserted by JS --></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" class="note">Percentages must total 100%.</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div id="sumWarnAboveButtons" class="warn hidden">% does not total 100</div>
+
+      <button id="addRowBtn">Add row</button>
+
+      <div class="controls">
+        <button id="revealKeyBtn">Reveal key information</button>
+        <button id="submitButton">Submit</button>
+        <button id="resetButton">Reset</button>
+      </div>
+
+      <!-- Password + key info -->
+      <div id="pwGate" class="hidden">
+        <div class="pwbox">
+          <label for="pwInput"><strong>Password:</strong></label>
+          <input type="password" id="pwInput" placeholder="Enter password">
+          <button id="pwCheckBtn">Unlock</button>
+          <span id="pwMsg" class="note"></span>
+        </div>
+      </div>
+
+      <div id="keyInfo" class="hidden" aria-live="polite">
+        <div id="keyWarn" class="warn hidden">% does not total 100</div>
+
+        <div id="keyStatsBlock">
+          <div class="row" style="margin-top:14px;">
+            <span><strong>Average prize:</strong> <input type="text" id="avgPrize" readonly style="width:160px;"></span>
+            <span><strong>Average RTP:</strong> <input type="text" id="avgRTP" readonly style="width:160px;"></span>
+          </div>
+          <div class="stats" id="theoryStats"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="spinnerScreen" class="hidden">
+      <div class="controls">
+        <button id="backButton">Back to Menu</button>
+        <button id="spinButton">Spin</button>
+        <button id="autoRunButton">Run 500 Trials</button>
+        <button id="stopButton" disabled>Stop</button>
+      </div>
+
+      <p id="resultText" class="ok"></p>
+      <div class="row">
+        <label>Balance:</label>
+        <input type="text" id="balanceBox" readonly style="width:160px;">
+        <span id="costInfo" class="note"></span>
+      </div>
+
+      <canvas id="balanceGraph" width="900" height="420"></canvas>
+      <div class="note">Graph shows balance after each spin. Zero line is shown if within range.</div>
     </div>
   </div>
-</div>
 
-<div id="spinnerScreen" class="hidden">
-  <div class="controls">
-    <button id="backButton">Back to Menu</button>
-    <button id="spinButton">Spin</button>
-    <button id="autoRunButton">Run 500 Trials</button>
-    <button id="stopButton" disabled>Stop</button>
-  </div>
-
-  <p id="resultText" class="ok"></p>
-  <div class="row">
-    <label>Balance:</label>
-    <input type="text" id="balanceBox" readonly style="width:160px;">
-    <span id="costInfo" class="note"></span>
-  </div>
-
-  <canvas id="balanceGraph" width="900" height="420"></canvas>
-  <div class="note">Graph shows balance after each spin. Zero line is shown if within range.</div>
-</div>
-
-<audio id="spinSound" src="https://www.soundjay.com/button/sounds/button-16.mp3"></audio>
+  <audio id="spinSound" src="https://www.soundjay.com/button/sounds/button-16.mp3"></audio>
 
 <script>
 /* ---------- State ---------- */
@@ -193,7 +202,6 @@ function addRow(v = "", p = "") {
   tr.querySelector('.delRowBtn').addEventListener('click', () => {
     tr.remove(); autoRefreshKeyInfo();
   });
-  // live updates on change
   tr.querySelector('.prize').addEventListener('input', autoRefreshKeyInfo);
   tr.querySelector('.pct').addEventListener('input', autoRefreshKeyInfo);
   tableBody.appendChild(tr);
@@ -221,14 +229,13 @@ function buildDistributionFromTable(){
   probs  = pcts.map(x => x/100);
   cdf = [];
   let c = 0; for (const p of probs) { c += p; cdf.push(c); }
-  if (cdf.length) cdf[cdf.length-1] = 1; // safety
+  if (cdf.length) cdf[cdf.length-1] = 1;
 }
 
 function expectedPrizeWeighted(){ return values.reduce((s,v,i)=> s + v*probs[i], 0); }
 
 /* ---------- Key info rendering ---------- */
 function renderKeyStats(){
-  // compute + render stats (assumes distribution has been built)
   const costPer = Number(costInput.value);
   if (Number.isNaN(costPer) || costPer <= 0) return;
 
@@ -261,10 +268,7 @@ function clearKeyStats(){
 }
 
 function showKeyInfo(){
-  // Decides what to show in the key info section (warning vs stats)
   const ok = percentagesSumTo100();
-
-  // toggle inline warnings (above buttons and inside key info)
   sumWarnAboveButtons.classList.toggle('hidden', ok);
   keyWarn.classList.toggle('hidden', ok);
 
@@ -285,7 +289,6 @@ function autoRefreshKeyInfo(){
   if (!pwGate.classList.contains('hidden') || !keyInfo.classList.contains('hidden')) {
     showKeyInfo();
   } else {
-    // still reflect sum warning above buttons even before reveal
     const ok = percentagesSumTo100();
     sumWarnAboveButtons.classList.toggle('hidden', ok);
   }
@@ -390,7 +393,6 @@ function toMenuScreen(){ document.getElementById('spinnerScreen').classList.add(
 
 function submit(){
   if (!percentagesSumTo100()){
-    // show inline warnings; do not alert
     sumWarnAboveButtons.classList.remove('hidden');
     keyWarn.classList.remove('hidden');
     keyStatsBlock.classList.add('hidden');
@@ -406,7 +408,6 @@ function submit(){
     return;
   }
 
-  // refresh key info (even if currently locked)
   showKeyInfo();
 
   balanceHistory = [balance]; spinCount = 0; insufficientFundsShown = false;
@@ -422,7 +423,6 @@ function resetAll(){
   costInput.value = 25;
   balanceInput.value = 10000;
 
-  // hide/lock key info
   keyInfo.classList.add('hidden');
   pwGate.classList.add('hidden');
   pwInput.value = "";
@@ -447,7 +447,7 @@ pwCheckBtn.addEventListener('click', ()=>{
   if (pwInput.value === "Piis3.14"){
     keyInfo.classList.remove('hidden');
     pwMsg.textContent = "Unlocked."; pwMsg.style.color = "#1b5e20";
-    autoRefreshKeyInfo(); // immediately reflect current numbers
+    autoRefreshKeyInfo();
   } else {
     pwMsg.textContent = "Incorrect password."; pwMsg.style.color = "#b00020";
   }
