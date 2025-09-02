@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Probability Spinner Simulator (Centered + Wheel)</title>
+<title>Probability Spinner Simulator (Wheel + Clean Line)</title>
 <style>
   :root {
     --fg:#111; --muted:#555; --border:#000; --accent:#1b5e20; --warn:#b00020;
@@ -150,7 +150,6 @@ let balance = 0, cost = 25, spinCount = 0;
 let balanceHistory = [];
 let autoRunInterval = null;
 let insufficientFundsShown = false;
-let autorunning = false;
 
 /* Wheel state */
 let wheelSegments = [];   // [{start,end,label,color}]
@@ -320,7 +319,7 @@ function buildWheelSegments(){
   wheelSegments = [];
   let a = 0;
   for (let i=0;i<probs.length;i++){
-    const span = probs[i]*Math.PI*2;
+    const span = probs[i]*TAU;
     const start = a;
     const end = a + span;
     a = end;
@@ -357,7 +356,7 @@ function drawWheel(){
   wctx.textBaseline = "middle";
   wheelSegments.forEach(seg=>{
     const span = seg.end - seg.start;
-    if (span < 0.06) return; // ~3.4°—too tiny to label
+    if (span < 0.06) return; // ~3.4°
     const mid = (seg.start + seg.end)/2 + rotation;
     const rx = CX + Math.cos(mid) * (R * 0.62);
     const ry = CY + Math.sin(mid) * (R * 0.62);
@@ -366,7 +365,7 @@ function drawWheel(){
 
   // center cap
   wctx.beginPath();
-  wctx.arc(CX,CY, 20, 0, Math.PI*2);
+  wctx.arc(CX,CY, 20, 0, TAU);
   wctx.fillStyle = "#fff";
   wctx.fill();
   wctx.strokeStyle="#000";
@@ -406,10 +405,10 @@ function animateSpinToIndex(idx, onDone){
   backButton.disabled = true;
 
   const pointerAngle = -Math.PI/2; // top
-  const midBase = segmentMidAngle(idx); // base geometry (no rotation)
-  const deltaToAlign = modTau(pointerAngle - (midBase + rotation)); // how much more to rotate to center target
-  const extraTurns = 4; // full spins for drama
-  const finalRotation = rotation + extraTurns*Math.PI*2 + deltaToAlign;
+  const midBase = segmentMidAngle(idx); // base geometry
+  const deltaToAlign = modTau(pointerAngle - (midBase + rotation)); // rotation needed
+  const extraTurns = 4; // full spins
+  const finalRotation = rotation + extraTurns*TAU + deltaToAlign;
 
   const duration = 3000; // ms
   const start = performance.now();
@@ -433,31 +432,49 @@ function animateSpinToIndex(idx, onDone){
   requestAnimationFrame(step);
 }
 
-/* ---------- Graph ---------- */
-function drawGraph(animatedIndex = balanceHistory.length - 1){
-  const Wg = canvas.width, Hg = canvas.height;
-  const left = 70, right = 24, top = 46, bottom = 46;
-  const plotW = Wg - left - right, plotH = Hg - top - bottom;
+/* ---------- Graph (always full redraw) ---------- */
+const graph = { left: 70, right: 24, top: 46, bottom: 46, yMin: null, yMax: null };
 
-  ctx.clearRect(0,0,Wg,Hg);
+function computeYRange(){
+  const minBal = Math.min(...balanceHistory);
+  const maxBal = Math.max(...balanceHistory);
+  let yMin = Math.min(minBal, 0);
+  let yMax = Math.max(maxBal, 1);
+  if (yMax - yMin < 1) yMax = yMin + 1;
+  return { yMin, yMax };
+}
+function yToPx(v){
+  const H = canvas.height, top = graph.top, bottom = graph.bottom;
+  const plotH = H - top - bottom;
+  return top + ((graph.yMax - v)/(graph.yMax - graph.yMin))*plotH;
+}
+function xToPx(i){
+  const W = canvas.width, left = graph.left, right = graph.right;
+  const plotW = W - left - right;
+  const n = Math.max(1, balanceHistory.length - 1);
+  return left + plotW*(i/n);
+}
+
+function drawAxesAndGrid(){
+  const W = canvas.width, H = canvas.height;
+  const { left, right, top, bottom } = graph;
+  const plotW = W - left - right, plotH = H - top - bottom;
+
+  ctx.clearRect(0,0,W,H);
   ctx.font = "22px Arial"; ctx.textAlign="center"; ctx.fillStyle="#000";
-  ctx.fillText("Balance over time", Wg/2, 32);
+  ctx.fillText("Balance over time", W/2, 32);
 
   ctx.strokeStyle = "#000"; ctx.lineWidth = 3; ctx.strokeRect(left, top, plotW, plotH);
 
-  const minBal = Math.min(...balanceHistory), maxBal = Math.max(...balanceHistory);
-  let yMin = Math.min(minBal, 0), yMax = Math.max(maxBal, 1);
-  if (yMax - yMin < 1) yMax = yMin + 1;
-
   ctx.font = "14px Arial"; ctx.textAlign="right"; ctx.fillStyle="#000";
   for (let i=0;i<=5;i++){
-    const t=i/5, yVal = yMax - t*(yMax-yMin), y = top + t*plotH;
+    const t=i/5, yVal = graph.yMax - t*(graph.yMax-graph.yMin), y = top + t*plotH;
     ctx.fillText(yVal.toFixed(0), left-8, y+4);
     ctx.strokeStyle = "#ddd"; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(left,y); ctx.lineTo(left+plotW,y); ctx.stroke();
   }
 
-  if (yMin < 0 && yMax > 0){
-    const t0 = (yMax-0)/(yMax-yMin), y0 = top + t0*plotH;
+  if (graph.yMin < 0 && graph.yMax > 0){
+    const t0 = (graph.yMax-0)/(graph.yMax-graph.yMin), y0 = top + t0*plotH;
     ctx.strokeStyle="#999"; ctx.setLineDash([6,5]); ctx.lineWidth=2;
     ctx.beginPath(); ctx.moveTo(left,y0); ctx.lineTo(left+plotW,y0); ctx.stroke(); ctx.setLineDash([]);
   }
@@ -469,22 +486,30 @@ function drawGraph(animatedIndex = balanceHistory.length - 1){
     ctx.fillText(idx, x, top+plotH+22);
     ctx.strokeStyle="#eee"; ctx.beginPath(); ctx.moveTo(x,top); ctx.lineTo(x,top+plotH); ctx.stroke();
   }
-
-  const xAt = i => left + plotW*(i/Math.max(1,n));
-  const yAt = v => top + ((yMax - v)/(yMax - yMin))*plotH;
-
-  ctx.strokeStyle = "#1e88e5"; ctx.lineWidth=3; ctx.beginPath();
-  for (let i=0;i<=animatedIndex;i++){ const x=xAt(i), y=yAt(balanceHistory[i]); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }
-  ctx.stroke();
-
-  ctx.fillStyle="#e53935";
-  for (let i=0;i<=animatedIndex;i++){ const x=xAt(i), y=yAt(balanceHistory[i]); ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill(); }
 }
 
-function animateGraph(){
-  let i=0, target=balanceHistory.length-1;
-  const step=()=>{ drawGraph(i); if(i<target){ i++; requestAnimationFrame(step);} };
-  step();
+function fullRedraw(){
+  const { yMin, yMax } = computeYRange();
+  graph.yMin = yMin; graph.yMax = yMax;
+
+  drawAxesAndGrid();
+
+  if (balanceHistory.length === 0) return;
+
+  // draw full line
+  ctx.strokeStyle = "#1e88e5"; ctx.lineWidth = 3; ctx.beginPath();
+  for (let i=0;i<balanceHistory.length;i++){
+    const x = xToPx(i), y = yToPx(balanceHistory[i]);
+    if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+
+  // draw points
+  ctx.fillStyle="#e53935";
+  for (let i=0;i<balanceHistory.length;i++){
+    const x = xToPx(i), y = yToPx(balanceHistory[i]);
+    ctx.beginPath(); ctx.arc(x,y,3,0,TAU); ctx.fill();
+  }
 }
 
 /* ---------- Sampling & run control ---------- */
@@ -494,10 +519,6 @@ function weightedPick(){
   while (lo<=hi){ const mid=(lo+hi)>>1; if (r<=cdf[mid]){ ans=mid; hi=mid-1; } else lo=mid+1; }
   return ans;
 }
-function setAutorun(run){
-  autorunning = run;
-  autoRunButton.disabled = run; spinButton.disabled = run || spinning; stopButton.disabled = !run;
-}
 
 function settleSpin(idx, win, manual){
   balance -= Number(costInput.value);
@@ -506,7 +527,9 @@ function settleSpin(idx, win, manual){
   balanceHistory.push(balance);
   resultText.textContent = `Spin #${spinCount}: won ${fmtMoney(win)} (p≈${fmtPct(probs[idx])})`;
   balanceBox.value = fmtMoney(balance);
-  if (manual) animateGraph(); else drawGraph();
+
+  // Always redraw full series so X-scale stays consistent (no end “fan”)
+  fullRedraw();
 }
 
 function spin(manual=true){
@@ -531,10 +554,10 @@ function spin(manual=true){
 }
 
 function autoRunTrials(total=500, speed=20){
-  let ct=0; clearInterval(autoRunInterval); setAutorun(true);
+  let ct=0; clearInterval(autoRunInterval); stopButton.disabled = false; autoRunButton.disabled = true; spinButton.disabled = true;
   autoRunInterval = setInterval(()=>{
     if (ct>=total || balance < Number(costInput.value)){
-      clearInterval(autoRunInterval); setAutorun(false);
+      clearInterval(autoRunInterval); stopButton.disabled = true; autoRunButton.disabled = false; spinButton.disabled = false;
       if (balance < Number(costInput.value) && !insufficientFundsShown) alert("Insufficient funds");
       insufficientFundsShown = balance < Number(costInput.value);
       return;
@@ -542,7 +565,7 @@ function autoRunTrials(total=500, speed=20){
     spin(false); ct++;
   }, speed);
 }
-function stopAutoRun(){ clearInterval(autoRunInterval); setAutorun(false); }
+function stopAutoRun(){ clearInterval(autoRunInterval); stopButton.disabled = true; autoRunButton.disabled = false; spinButton.disabled = false; }
 
 /* ---------- Navigation / setup ---------- */
 function toSpinnerScreen(){
@@ -550,16 +573,17 @@ function toSpinnerScreen(){
   document.getElementById('spinnerScreen').classList.remove('hidden');
   buildWheelSegments();
   drawWheel();
+  fullRedraw(); // fresh graph
 }
 function toMenuScreen(){
   document.getElementById('spinnerScreen').classList.add('hidden');
   document.getElementById('menuScreen').classList.remove('hidden');
 
-  /* NEW: Re-lock key info when returning to menu */
-  keyInfo.classList.add('hidden');     // hide revealed info
-  pwGate.classList.add('hidden');      // hide the password strip
-  pwInput.value = "";                  // clear the password field
-  pwMsg.textContent = "";              // clear status message
+  // Re-lock key info when returning to menu
+  keyInfo.classList.add('hidden');
+  pwGate.classList.add('hidden');
+  pwInput.value = "";
+  pwMsg.textContent = "";
 }
 
 function submit(){
@@ -582,10 +606,10 @@ function submit(){
   showKeyInfo();
 
   balanceHistory = [balance]; spinCount = 0; insufficientFundsShown = false;
+
   toSpinnerScreen();
   balanceBox.value = fmtMoney(balance);
   costInfo.textContent = `Cost per spin: ${fmtMoney(cost)}`;
-  drawGraph();
 }
 
 function resetAll(){
@@ -603,6 +627,9 @@ function resetAll(){
 
   rotation = 0; wheelSegments = [];
   drawWheel();
+
+  // reset graph canvas
+  ctx.clearRect(0,0,canvas.width, canvas.height);
 }
 
 /* ---------- Events ---------- */
